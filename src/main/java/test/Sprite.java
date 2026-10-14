@@ -7,35 +7,31 @@ import java.io.IOException;
 
 public class Sprite {
 
+    // folder, file prefix, frame count; order sets the animation index (0 idle, 1 walk, 2 run, 3 punch, ...)
+    static final Object[][] ANIMATIONS = {
+            {"Idle", "idle", 4}, {"Walk", "walking", 8}, {"Run", "run", 8}, {"Punch", "punch", 4},
+            {"Kick", "kick", 5}, {"Dash", "dash", 9}, {"Taunt", "taunt", 13}, {"Slide", "slide", 5},
+            {"JumpKick", "jumpkick", 8}, {"Combo", "combo", 12}, {"Uppercut", "uppercut", 8}, {"Palm", "palm", 8},
+            {"Hurt", "hurt", 7}, {"Knockback", "knockback", 6}, {"KnockedDown", "knockeddown", 9}, {"GetUp", "getup", 10},
+            {"Block", "block", 6}, {"Guard", "guard", 3}, {"GroundHurt", "groundhurt", 5}, {"GroundKick", "groundkick", 5},
+            {"Grabbed", "grabbed", 2}, {"Stagger", "stagger", 5}, {"Thrown", "thrown", 6}, {"HeadScratch", "headscratch", 11},
+            {"Stunned", "stunned", 4},
+    };
+
     BufferedImage[][] animation;
-    BufferedImage[] playerIdle;
-    BufferedImage[] playerWalking;
-    BufferedImage[] playerRunning;
-    BufferedImage[] playerPunch;
+    String[] names;
 
     Sprite() {
-        playerIdle = new BufferedImage[4];
-        playerWalking = new BufferedImage[8];
-        playerRunning = new BufferedImage[8];
-        playerPunch = new BufferedImage[4];
-        animation = new BufferedImage[4][];
+        animation = new BufferedImage[ANIMATIONS.length][];
+        names = new String[ANIMATIONS.length];
 
-        for (int i = 0; i < playerIdle.length; i++) {
-            playerIdle[i] = createImage(".\\Sprites\\Brad\\Idle\\idle"+(i+1)+".png");
+        for (int a = 0; a < ANIMATIONS.length; a++) {
+            names[a] = (String) ANIMATIONS[a][0];
+            animation[a] = new BufferedImage[(int) ANIMATIONS[a][2]];
+            for (int i = 0; i < animation[a].length; i++) {
+                animation[a][i] = createImage(".\\Sprites\\Brad\\" + names[a] + "\\" + ANIMATIONS[a][1] + (i + 1) + ".png");
+            }
         }
-        for (int i = 0; i < playerWalking.length; i++) {
-            playerWalking[i] = createImage(".\\Sprites\\Brad\\Walk\\walking"+(i+1)+".png");
-        }
-        for (int i = 0; i < playerRunning.length; i++) {
-            playerRunning[i] = createImage(".\\Sprites\\Brad\\Run\\run"+(i+1)+".png");
-        }
-
-        animation[0] = playerIdle;
-        animation[1] = playerWalking;
-        animation[2] = playerRunning;
-        animation[3] = playerPunch;
-
-
     }
 
     private BufferedImage createImage(String filename){
