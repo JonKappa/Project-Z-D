@@ -41,7 +41,7 @@ public class MyPanel extends JPanel implements ActionListener, KeyListener {
         p = new Sprite();
         this.setPreferredSize(new Dimension(PANEL_WIDTH,PANEL_HEIGHT));
 
-        backGround = createImage(".\\Sprites\\Background\\testBackground.png");
+        backGround = createImage("./Sprites/Background/testBackground.png");
         timer = new Timer(100, this);
         timer.start();
         addKeyListener(this);

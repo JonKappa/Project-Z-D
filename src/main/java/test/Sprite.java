@@ -21,13 +21,13 @@ public class Sprite {
         animation = new BufferedImage[4][];
 
         for (int i = 0; i < playerIdle.length; i++) {
-            playerIdle[i] = createImage(".\\Sprites\\Brad\\Idle\\idle"+(i+1)+".png");
+            playerIdle[i] = createImage("./Sprites/Brad/Idle/idle"+(i+1)+".png");
         }
         for (int i = 0; i < playerWalking.length; i++) {
-            playerWalking[i] = createImage(".\\Sprites\\Brad\\Walk\\walking"+(i+1)+".png");
+            playerWalking[i] = createImage("./Sprites/Brad/Walk/walking"+(i+1)+".png");
         }
         for (int i = 0; i < playerRunning.length; i++) {
-            playerRunning[i] = createImage(".\\Sprites\\Brad\\Run\\run"+(i+1)+".png");
+            playerRunning[i] = createImage("./Sprites/Brad/Run/run"+(i+1)+".png");
         }
 
         animation[0] = playerIdle;
