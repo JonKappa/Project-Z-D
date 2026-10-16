@@ -67,8 +67,7 @@ public class MyPanel extends JPanel implements ActionListener {
         // the left-side facings have no frames of their own; they draw their right-side twin mirrored
         int direction = switch (player.facing) {
             case DOWN -> Sprite.DOWN;
-            case DOWN_RIGHT, DOWN_LEFT -> Sprite.DOWN_RIGHT;
-            case RIGHT, LEFT -> Sprite.RIGHT;
+            case DOWN_RIGHT, DOWN_LEFT, RIGHT, LEFT -> Sprite.DOWN_RIGHT;
             case UP_RIGHT, UP_LEFT -> Sprite.UP_RIGHT;
             case UP -> Sprite.UP;
         };
