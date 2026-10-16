@@ -73,7 +73,14 @@ public class MyPanel extends JPanel implements ActionListener {
             case UP -> Sprite.UP;
         };
         boolean mirrored = player.facing.dirX < 0;
-        BufferedImage img = p.animation[direction][player.state.animationIndex][player.frame];
+        BufferedImage[] frames = p.animation[direction][player.state.animationIndex];
+        int frame = player.frame;
+        if (mirrored && (player.state == Player.State.WALK || player.state == Player.State.RUN)) {
+            // mirroring swaps which foot is in front, so a mirrored stride is shifted by half a cycle;
+            // that keeps the same foot forward when turning between down and down-left, or up and up-left
+            frame = (frame + frames.length / 2) % frames.length;
+        }
+        BufferedImage img = frames[frame];
         int x = (int) player.x;
         int y = (int) player.y;
         if (mirrored) {
