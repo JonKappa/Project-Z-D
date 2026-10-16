@@ -4,7 +4,6 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -12,30 +11,18 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 
 
-public class MyPanel extends JPanel implements ActionListener, KeyListener {
-
-    boolean wPressed = false;
-    boolean aPressed = false;
-    boolean sPressed = false;
-    boolean dPressed = false;
+public class MyPanel extends JPanel implements ActionListener {
 
     BufferedImage backGround;
     final int PANEL_WIDTH = 640;
     final int PANEL_HEIGHT = 480;
     Timer timer;
-    double xVelocity = 0;
-    double yVelocity = 0;
-    int walkingSpeed = 7;
-    double x = 0;
-    double y = 0;
-    int frame = 0;
-    int animationIndex = 0;
+    long lastTickTime;
     Sprite p;
-    boolean facingLeft = false;
-    boolean isRunning = false;
-    boolean controlsKeyPressed = false;
+    Player player;
+    Input input;
     boolean showGallery = true; // G toggles between the animation gallery and the game
-    int galleryTick = 0;
+    double galleryTime = 0;
 
 
 
@@ -43,52 +30,52 @@ public class MyPanel extends JPanel implements ActionListener, KeyListener {
         p = new Sprite();
         this.setPreferredSize(new Dimension(PANEL_WIDTH,PANEL_HEIGHT));
 
-        backGround = createImage(".\\Sprites\\Background\\testBackground.png");
-        timer = new Timer(100, this);
+        backGround = createImage("Sprites/Background/testBackground.png");
+
+        int[] frameCounts = new int[p.animation.length];
+        for (int a = 0; a < frameCounts.length; a++) {
+            frameCounts[a] = p.animation[a].length;
+        }
+        BufferedImage idle = p.animation[Player.State.IDLE.animationIndex][0];
+        player = new Player(0, 0, idle.getWidth(), idle.getHeight(), frameCounts);
+        input = new Input();
+
+        lastTickTime = System.nanoTime();
+        timer = new Timer(16, this); // about 60 updates a second
         timer.start();
-        addKeyListener(this);
-        setFocusable(true);
-        setFocusTraversalKeysEnabled(false);
+    }
+
+    // the window calls this once it exists, so keys held while it loses focus don't stay stuck down
+    void watchFocus(Window window) {
+        window.addWindowFocusListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowLostFocus(java.awt.event.WindowEvent e) {
+                input.releaseAll();
+            }
+        });
     }
 
 
-    public void paint(Graphics g) {
-        super.paint(g); // paint background
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
 
         Graphics2D g2D = (Graphics2D) g;
-
-
-
-        if (isRunning && controlsKeyPressed) {
-            animationIndex = 2;
-        }
-        else if (controlsKeyPressed) {
-            animationIndex = 1;
-        }
-        else if (xVelocity == 0 && yVelocity == 0) {
-            animationIndex = 0;
-        }
-
-        int width = p.animation[animationIndex][frame].getWidth();
-        int height = p.animation[animationIndex][frame].getHeight();
 
         g2D.drawImage(backGround, 0, 0, null);
         if (showGallery) {
             drawGallery(g2D);
             return;
         }
-        if (facingLeft) {
-            g2D.drawImage(p.animation[animationIndex][frame], (int) x + width, (int) y, -width, height, null);
+
+        BufferedImage img = p.animation[player.state.animationIndex][player.frame];
+        int x = (int) player.x;
+        int y = (int) player.y;
+        if (player.facingLeft) {
+            g2D.drawImage(img, x + img.getWidth(), y, -img.getWidth(), img.getHeight(), null);
         }
         else {
-            g2D.drawImage(p.animation[animationIndex][frame], (int) x, (int) y, width, height, null);
-        }
-
-
-        if (frame == p.animation[animationIndex].length - 1) {
-            frame = 0;
-        } else {
-            frame += 1;
+            g2D.drawImage(img, x, y, img.getWidth(), img.getHeight(), null);
         }
     }
 
@@ -99,6 +86,7 @@ public class MyPanel extends JPanel implements ActionListener, KeyListener {
         int rows = (p.animation.length + cols - 1) / cols;
         int cellW = PANEL_WIDTH / cols;
         int cellH = PANEL_HEIGHT / rows;
+        int galleryTick = (int) (galleryTime / Player.FRAME_TIME);
         g2D.setFont(new Font("SansSerif", Font.BOLD, 11));
 
         for (int a = 0; a < p.animation.length; a++) {
@@ -133,151 +121,33 @@ public class MyPanel extends JPanel implements ActionListener, KeyListener {
         return null;
     }
 
-    public static void wait(int ms)
-    {
-        try
-        {
-            Thread.sleep(ms);
-        }
-        catch(InterruptedException ex)
-        {
-            Thread.currentThread().interrupt();
-        }
-        //catches if InterruptedException happens
-        // if it does, it interrupts the current thread (thread.sleep
-    }
-
+    // one game tick: read the keys, move the player, then redraw
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (wPressed || aPressed || sPressed || dPressed) {
-            if (wPressed) {
-                up();
-            }
-            if (sPressed) {
-                down();
-            }
-            if (aPressed) {
-                left();
-            }
-            if (dPressed) {
-                right();
-            }
-            controlsKeyPressed = true;
-        }
-        x += xVelocity;
-        y += yVelocity;
-        galleryTick++;
-        repaint();
-    }
+        long now = System.nanoTime();
+        double dt = Math.min((now - lastTickTime) / 1_000_000_000.0, 0.05); // cap it so a hiccup can't teleport Brad
+        lastTickTime = now;
 
-    public void up() {
-        yVelocity = -walkingSpeed;
-
-        if (isRunning) {
-            yVelocity = -walkingSpeed * 2;
-        }
-    }
-
-    public void down() {
-        yVelocity = walkingSpeed;
-
-        if (isRunning) {
-            yVelocity = walkingSpeed * 2;
-        }
-    }
-
-    public void left() {
-        facingLeft = true;
-        xVelocity = -walkingSpeed;
-
-        if (isRunning) {
-            xVelocity = -walkingSpeed * 2;
-        }
-
-    }
-
-    public void right() {
-        facingLeft = false;
-        xVelocity = walkingSpeed;
-
-        if (isRunning) {
-            xVelocity = walkingSpeed * 2;
-        }
-    }
-
-
-
-    @Override
-    public void keyTyped(KeyEvent e) {
-
-    }
-
-    @Override
-    public void keyPressed(KeyEvent e) {
-        int code = e.getKeyCode();
-
-        if (code == KeyEvent.VK_W) {
-            wPressed = true;
-        }
-        if (code == KeyEvent.VK_S) {
-            sPressed = true;
-        }
-        if (code == KeyEvent.VK_A) {
-            aPressed = true;
-        }
-        if (code == KeyEvent.VK_D) {
-            right();
-            dPressed = true;
-        }
-        if (code == KeyEvent.VK_SHIFT) {
-            isRunning = true;
-        }
-        if (code == KeyEvent.VK_G) {
+        if (input.wasPressed(KeyEvent.VK_G)) {
             showGallery = !showGallery;
         }
 
+        // holding both opposite keys cancels out instead of one silently winning
+        int dirX = 0;
+        int dirY = 0;
+        if (input.isDown(KeyEvent.VK_A, KeyEvent.VK_LEFT)) dirX -= 1;
+        if (input.isDown(KeyEvent.VK_D, KeyEvent.VK_RIGHT)) dirX += 1;
+        if (input.isDown(KeyEvent.VK_W, KeyEvent.VK_UP)) dirY -= 1;
+        if (input.isDown(KeyEvent.VK_S, KeyEvent.VK_DOWN)) dirY += 1;
+        boolean running = input.isDown(KeyEvent.VK_SHIFT);
 
+        if (!showGallery) {
+            player.update(dt, dirX, dirY, running, PANEL_WIDTH, PANEL_HEIGHT);
+        }
+        galleryTime += dt;
 
+        input.endTick();
+        repaint();
+        Toolkit.getDefaultToolkit().sync(); // stops the animation stuttering on Linux
     }
-
-    @Override
-    public void keyReleased(KeyEvent e) {
-        int code = e.getKeyCode();
-
-        if (code == KeyEvent.VK_W) {
-            wPressed = false;
-        }
-        if (code == KeyEvent.VK_S) {
-            sPressed = false;
-        }
-        if (code == KeyEvent.VK_A) {
-            aPressed = false;
-        }
-        if (code == KeyEvent.VK_D) {
-            dPressed = false;
-        }
-        if (code == KeyEvent.VK_SHIFT) {
-            isRunning = false;
-        }
-
-        if (!wPressed) {
-            yVelocity = 0;
-        }
-        if (!sPressed) {
-            yVelocity = 0;
-        }
-        if (!aPressed) {
-            xVelocity = 0;
-        }
-        if (!dPressed) {
-            xVelocity = 0;
-        }
-
-        if (!wPressed && !aPressed && !sPressed && !dPressed) {
-            controlsKeyPressed = false;
-            frame = 0;
-        }
-    }
-
 }
-

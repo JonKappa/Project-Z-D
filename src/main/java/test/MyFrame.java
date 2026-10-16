@@ -12,6 +12,7 @@ public class MyFrame extends JFrame{
 
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.add(panel);
+        panel.watchFocus(this);
         this.pack();
         this.setLocationRelativeTo(null);
         this.setVisible(true);

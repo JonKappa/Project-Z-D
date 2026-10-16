@@ -29,7 +29,7 @@ public class Sprite {
             names[a] = (String) ANIMATIONS[a][0];
             animation[a] = new BufferedImage[(int) ANIMATIONS[a][2]];
             for (int i = 0; i < animation[a].length; i++) {
-                animation[a][i] = createImage(".\\Sprites\\Brad\\" + names[a] + "\\" + ANIMATIONS[a][1] + (i + 1) + ".png");
+                animation[a][i] = createImage("Sprites/Brad/" + names[a] + "/" + ANIMATIONS[a][1] + (i + 1) + ".png");
             }
         }
     }
