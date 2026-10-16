@@ -88,7 +88,10 @@ public class Player {
 
         if (newState != state) {
             state = newState;
-            frame = 0;
+            // the left-side facings play their strides half a cycle on (see MyPanel), so a stride
+            // starting there starts half a cycle in, and every facing steps off on the same frame
+            boolean mirroredStride = state != State.IDLE && facing.dirX < 0;
+            frame = mirroredStride ? frameCounts[state.animationIndex] / 2 : 0;
             frameTimer = 0;
         }
         frameTimer += dt;
