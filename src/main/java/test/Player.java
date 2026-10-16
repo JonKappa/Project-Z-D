@@ -13,6 +13,8 @@ public class Player {
         }
     }
 
+    enum Facing { DOWN, UP, LEFT, RIGHT }
+
     static final double WALK_SPEED = 70;      // pixels per second
     static final double RUN_SPEED = 140;
     static final double FRAME_TIME = 0.1;     // seconds each animation frame stays on screen
@@ -21,7 +23,7 @@ public class Player {
     double y;
     final int width;
     final int height;
-    boolean facingLeft = false;
+    Facing facing = Facing.DOWN;
     State state = State.IDLE;
     int frame = 0;
     private double frameTimer = 0;
@@ -48,8 +50,11 @@ public class Player {
             x = Math.max(0, Math.min(x, maxX - width));
             y = Math.max(0, Math.min(y, maxY - height));
         }
+        // sideways wins on diagonals, since there are no diagonal sprites
         if (dirX != 0) {
-            facingLeft = dirX < 0;
+            facing = dirX < 0 ? Facing.LEFT : Facing.RIGHT;
+        } else if (dirY != 0) {
+            facing = dirY < 0 ? Facing.UP : Facing.DOWN;
         }
 
         if (newState != state) {

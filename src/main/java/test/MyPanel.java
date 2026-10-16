@@ -30,11 +30,13 @@ public class MyPanel extends JPanel implements ActionListener {
 
         backGround = createImage("./Sprites/Background/testBackground.png");
 
-        int[] frameCounts = new int[p.animation.length];
+        // every direction has the same number of frames per animation
+        BufferedImage[][] down = p.animation[Sprite.DOWN];
+        int[] frameCounts = new int[down.length];
         for (int a = 0; a < frameCounts.length; a++) {
-            frameCounts[a] = p.animation[a].length;
+            frameCounts[a] = down[a].length;
         }
-        BufferedImage idle = p.animation[Player.State.IDLE.animationIndex][0];
+        BufferedImage idle = down[Player.State.IDLE.animationIndex][0];
         player = new Player(0, 0, idle.getWidth(), idle.getHeight(), frameCounts);
         input = new Input();
 
@@ -62,10 +64,16 @@ public class MyPanel extends JPanel implements ActionListener {
 
         g2D.drawImage(backGround, 0, 0, null);
 
-        BufferedImage img = p.animation[player.state.animationIndex][player.frame];
+        int direction;
+        switch (player.facing) {
+            case UP: direction = Sprite.UP; break;
+            case DOWN: direction = Sprite.DOWN; break;
+            default: direction = Sprite.SIDE; break;
+        }
+        BufferedImage img = p.animation[direction][player.state.animationIndex][player.frame];
         int x = (int) player.x;
         int y = (int) player.y;
-        if (player.facingLeft) {
+        if (player.facing == Player.Facing.LEFT) {
             g2D.drawImage(img, x + img.getWidth(), y, -img.getWidth(), img.getHeight(), null);
         }
         else {
