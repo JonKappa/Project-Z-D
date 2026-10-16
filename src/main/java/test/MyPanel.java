@@ -77,7 +77,7 @@ public class MyPanel extends JPanel implements ActionListener {
         int x = (int) player.x;
         int y = (int) player.y;
         if (mirrored) {
-            g2D.drawImage(img, x + img.getWidth(), y, -img.getWidth(), img.getHeight(), null);
+            g2D.drawImage(img, x + 2 * Sprite.CENTER_X, y, -img.getWidth(), img.getHeight(), null);
         }
         else {
             g2D.drawImage(img, x, y, img.getWidth(), img.getHeight(), null);

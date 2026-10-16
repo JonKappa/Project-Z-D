@@ -14,6 +14,10 @@ public class Sprite {
     static final int UP_RIGHT = 3;
     static final int UP = 4;
 
+    // the middle of the character in every frame; the art sits left of the frame's own centre,
+    // so mirroring around this keeps the character in place when it turns left or right
+    static final int CENTER_X = 36;
+
     BufferedImage[][][] animation; // [direction][animation][frame], animation index is Player.State.animationIndex
 
     Sprite() {
