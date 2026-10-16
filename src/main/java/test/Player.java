@@ -31,6 +31,9 @@ public class Player {
     static final double WALK_SPEED = 70;      // pixels per second
     static final double RUN_SPEED = 140;
     static final double DODGE_SPEED = 200;    // a roll lasts 8 frames x 0.075 s, so it covers about 120 px
+    // speed of each dodge frame as a share of DODGE_SPEED: slow while the boots are planted
+    // (crouch, land, stand up) so they don't skate, fast while diving and rolling; averages 1
+    static final double[] DODGE_PACE = {0.4, 1.3, 1.4, 1.4, 1.4, 1.3, 0.6, 0.2};
     static final double DIAGONAL_GRACE = 0.1; // seconds a diagonal facing survives one of its two keys being let go
 
     double x;
@@ -61,7 +64,7 @@ public class Player {
             startDodge(dirX, dirY);
         }
         if (state == State.DODGE) {
-            move(dodgeX, dodgeY, DODGE_SPEED, dt, maxX, maxY);
+            move(dodgeX, dodgeY, DODGE_SPEED * DODGE_PACE[frame], dt, maxX, maxY);
             frameTimer += dt;
             while (frameTimer >= state.frameTime) {
                 frameTimer -= state.frameTime;
