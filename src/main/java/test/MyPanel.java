@@ -108,8 +108,9 @@ public class MyPanel extends JPanel implements ActionListener {
         if (input.isDown(KeyEvent.VK_W, KeyEvent.VK_UP)) dirY -= 1;
         if (input.isDown(KeyEvent.VK_S, KeyEvent.VK_DOWN)) dirY += 1;
         boolean running = input.isDown(KeyEvent.VK_SHIFT);
+        boolean dodge = input.wasPressed(KeyEvent.VK_SPACE);
 
-        player.update(dt, dirX, dirY, running, PANEL_WIDTH, PANEL_HEIGHT);
+        player.update(dt, dirX, dirY, running, dodge, PANEL_WIDTH, PANEL_HEIGHT);
 
         input.endTick();
         repaint();
