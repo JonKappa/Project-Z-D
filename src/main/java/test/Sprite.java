@@ -9,9 +9,10 @@ public class Sprite {
 
     // which set of frames to draw; the left-side facings reuse the right-side frames mirrored
     static final int DOWN = 0;
-    static final int DOWN_RIGHT = 1; // also used for facing straight right
+    static final int DOWN_RIGHT = 1;
     static final int UP_RIGHT = 2;
     static final int UP = 3;
+    static final int RIGHT = 4; // the down-right frames, except for its own side-on dodge roll
 
     // the middle of the character in every frame; the art sits left of the frame's own centre,
     // so mirroring around this keeps the character in place when it turns left or right
@@ -21,7 +22,7 @@ public class Sprite {
 
     Sprite() {
         String[] directions = {"Down", "DownRight", "UpRight", "Up"}; // same order as the constants above
-        animation = new BufferedImage[directions.length][][];
+        animation = new BufferedImage[directions.length + 1][][];
         for (int d = 0; d < directions.length; d++) {
             String folder = "./Sprites/Survivor/" + directions[d];
             animation[d] = new BufferedImage[][] {
@@ -31,6 +32,8 @@ public class Sprite {
                 loadFrames(folder + "/Dodge/dodge", 8),
             };
         }
+        animation[RIGHT] = animation[DOWN_RIGHT].clone();
+        animation[RIGHT][Player.State.DODGE.animationIndex] = loadFrames("./Sprites/Survivor/Right/Dodge/dodge", 8);
     }
 
     private BufferedImage[] loadFrames(String prefix, int count) {
