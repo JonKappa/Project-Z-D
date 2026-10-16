@@ -17,18 +17,10 @@ public class MyPanel extends JPanel implements ActionListener {
     final int PANEL_WIDTH = 640;
     final int PANEL_HEIGHT = 480;
     Timer timer;
-    double xVelocity = 0;
-    double yVelocity = 0;
-    int walkingSpeed = 7;
-    double x = 0;
-    double y = 0;
-    int frame = 0;
-    int animationIndex = 0;
+    long lastTickTime;
     Sprite p;
+    Player player;
     Input input;
-    boolean facingLeft = false;
-    boolean isRunning = false;
-    boolean controlsKeyPressed = false;
 
 
 
@@ -37,8 +29,17 @@ public class MyPanel extends JPanel implements ActionListener {
         this.setPreferredSize(new Dimension(PANEL_WIDTH,PANEL_HEIGHT));
 
         backGround = createImage("./Sprites/Background/testBackground.png");
+
+        int[] frameCounts = new int[p.animation.length];
+        for (int a = 0; a < frameCounts.length; a++) {
+            frameCounts[a] = p.animation[a].length;
+        }
+        BufferedImage idle = p.animation[Player.State.IDLE.animationIndex][0];
+        player = new Player(0, 0, idle.getWidth(), idle.getHeight(), frameCounts);
         input = new Input();
-        timer = new Timer(100, this);
+
+        lastTickTime = System.nanoTime();
+        timer = new Timer(16, this); // about 60 updates a second
         timer.start();
     }
 
@@ -53,39 +54,22 @@ public class MyPanel extends JPanel implements ActionListener {
     }
 
 
-    public void paint(Graphics g) {
-        super.paint(g); // paint background
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
 
         Graphics2D g2D = (Graphics2D) g;
 
-
-
-        if (isRunning && controlsKeyPressed) {
-            animationIndex = 2;
-        }
-        else if (controlsKeyPressed) {
-            animationIndex = 1;
-        }
-        else if (xVelocity == 0 && yVelocity == 0) {
-            animationIndex = 0;
-        }
-
-        int width = p.animation[animationIndex][frame].getWidth();
-        int height = p.animation[animationIndex][frame].getHeight();
-
         g2D.drawImage(backGround, 0, 0, null);
-        if (facingLeft) {
-            g2D.drawImage(p.animation[animationIndex][frame], (int) x + width, (int) y, -width, height, null);
+
+        BufferedImage img = p.animation[player.state.animationIndex][player.frame];
+        int x = (int) player.x;
+        int y = (int) player.y;
+        if (player.facingLeft) {
+            g2D.drawImage(img, x + img.getWidth(), y, -img.getWidth(), img.getHeight(), null);
         }
         else {
-            g2D.drawImage(p.animation[animationIndex][frame], (int) x, (int) y, width, height, null);
-        }
-
-
-        if (frame == p.animation[animationIndex].length - 1) {
-            frame = 0;
-        } else {
-            frame += 1;
+            g2D.drawImage(img, x, y, img.getWidth(), img.getHeight(), null);
         }
     }
 
@@ -101,87 +85,26 @@ public class MyPanel extends JPanel implements ActionListener {
         return null;
     }
 
-    public static void wait(int ms)
-    {
-        try
-        {
-            Thread.sleep(ms);
-        }
-        catch(InterruptedException ex)
-        {
-            Thread.currentThread().interrupt();
-        }
-        //catches if InterruptedException happens
-        // if it does, it interrupts the current thread (thread.sleep
-    }
-
+    // one game tick: read the keys, move the player, then redraw
     @Override
     public void actionPerformed(ActionEvent e) {
-        boolean wPressed = input.isDown(KeyEvent.VK_W, KeyEvent.VK_UP);
-        boolean aPressed = input.isDown(KeyEvent.VK_A, KeyEvent.VK_LEFT);
-        boolean sPressed = input.isDown(KeyEvent.VK_S, KeyEvent.VK_DOWN);
-        boolean dPressed = input.isDown(KeyEvent.VK_D, KeyEvent.VK_RIGHT);
-        isRunning = input.isDown(KeyEvent.VK_SHIFT);
+        long now = System.nanoTime();
+        double dt = Math.min((now - lastTickTime) / 1_000_000_000.0, 0.05); // cap it so a hiccup can't teleport Brad
+        lastTickTime = now;
 
-        boolean moving = wPressed || aPressed || sPressed || dPressed;
-        if (controlsKeyPressed && !moving) {
-            frame = 0;
-        }
-        controlsKeyPressed = moving;
+        // holding both opposite keys cancels out instead of one silently winning
+        int dirX = 0;
+        int dirY = 0;
+        if (input.isDown(KeyEvent.VK_A, KeyEvent.VK_LEFT)) dirX -= 1;
+        if (input.isDown(KeyEvent.VK_D, KeyEvent.VK_RIGHT)) dirX += 1;
+        if (input.isDown(KeyEvent.VK_W, KeyEvent.VK_UP)) dirY -= 1;
+        if (input.isDown(KeyEvent.VK_S, KeyEvent.VK_DOWN)) dirY += 1;
+        boolean running = input.isDown(KeyEvent.VK_SHIFT);
 
-        xVelocity = 0;
-        yVelocity = 0;
-        if (wPressed) {
-            up();
-        }
-        if (sPressed) {
-            down();
-        }
-        if (aPressed) {
-            left();
-        }
-        if (dPressed) {
-            right();
-        }
-        x += xVelocity;
-        y += yVelocity;
+        player.update(dt, dirX, dirY, running, PANEL_WIDTH, PANEL_HEIGHT);
+
         input.endTick();
         repaint();
+        Toolkit.getDefaultToolkit().sync(); // stops the animation stuttering on Linux
     }
-
-    public void up() {
-        yVelocity = -walkingSpeed;
-
-        if (isRunning) {
-            yVelocity = -walkingSpeed * 2;
-        }
-    }
-
-    public void down() {
-        yVelocity = walkingSpeed;
-
-        if (isRunning) {
-            yVelocity = walkingSpeed * 2;
-        }
-    }
-
-    public void left() {
-        facingLeft = true;
-        xVelocity = -walkingSpeed;
-
-        if (isRunning) {
-            xVelocity = -walkingSpeed * 2;
-        }
-
-    }
-
-    public void right() {
-        facingLeft = false;
-        xVelocity = walkingSpeed;
-
-        if (isRunning) {
-            xVelocity = walkingSpeed * 2;
-        }
-    }
-
 }
