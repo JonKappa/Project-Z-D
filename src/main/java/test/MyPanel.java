@@ -4,7 +4,6 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -12,12 +11,7 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 
 
-public class MyPanel extends JPanel implements ActionListener, KeyListener {
-
-    boolean wPressed = false;
-    boolean aPressed = false;
-    boolean sPressed = false;
-    boolean dPressed = false;
+public class MyPanel extends JPanel implements ActionListener {
 
     BufferedImage backGround;
     final int PANEL_WIDTH = 640;
@@ -31,6 +25,7 @@ public class MyPanel extends JPanel implements ActionListener, KeyListener {
     int frame = 0;
     int animationIndex = 0;
     Sprite p;
+    Input input;
     boolean facingLeft = false;
     boolean isRunning = false;
     boolean controlsKeyPressed = false;
@@ -42,11 +37,19 @@ public class MyPanel extends JPanel implements ActionListener, KeyListener {
         this.setPreferredSize(new Dimension(PANEL_WIDTH,PANEL_HEIGHT));
 
         backGround = createImage("./Sprites/Background/testBackground.png");
+        input = new Input();
         timer = new Timer(100, this);
         timer.start();
-        addKeyListener(this);
-        setFocusable(true);
-        setFocusTraversalKeysEnabled(false);
+    }
+
+    // the window calls this once it exists, so keys held while it loses focus don't stay stuck down
+    void watchFocus(Window window) {
+        window.addWindowFocusListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowLostFocus(java.awt.event.WindowEvent e) {
+                input.releaseAll();
+            }
+        });
     }
 
 
@@ -114,23 +117,35 @@ public class MyPanel extends JPanel implements ActionListener, KeyListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (wPressed || aPressed || sPressed || dPressed) {
-            if (wPressed) {
-                up();
-            }
-            if (sPressed) {
-                down();
-            }
-            if (aPressed) {
-                left();
-            }
-            if (dPressed) {
-                right();
-            }
-            controlsKeyPressed = true;
+        boolean wPressed = input.isDown(KeyEvent.VK_W, KeyEvent.VK_UP);
+        boolean aPressed = input.isDown(KeyEvent.VK_A, KeyEvent.VK_LEFT);
+        boolean sPressed = input.isDown(KeyEvent.VK_S, KeyEvent.VK_DOWN);
+        boolean dPressed = input.isDown(KeyEvent.VK_D, KeyEvent.VK_RIGHT);
+        isRunning = input.isDown(KeyEvent.VK_SHIFT);
+
+        boolean moving = wPressed || aPressed || sPressed || dPressed;
+        if (controlsKeyPressed && !moving) {
+            frame = 0;
+        }
+        controlsKeyPressed = moving;
+
+        xVelocity = 0;
+        yVelocity = 0;
+        if (wPressed) {
+            up();
+        }
+        if (sPressed) {
+            down();
+        }
+        if (aPressed) {
+            left();
+        }
+        if (dPressed) {
+            right();
         }
         x += xVelocity;
         y += yVelocity;
+        input.endTick();
         repaint();
     }
 
@@ -169,76 +184,4 @@ public class MyPanel extends JPanel implements ActionListener, KeyListener {
         }
     }
 
-
-
-    @Override
-    public void keyTyped(KeyEvent e) {
-
-    }
-
-    @Override
-    public void keyPressed(KeyEvent e) {
-        int code = e.getKeyCode();
-
-        if (code == KeyEvent.VK_W) {
-            wPressed = true;
-        }
-        if (code == KeyEvent.VK_S) {
-            sPressed = true;
-        }
-        if (code == KeyEvent.VK_A) {
-            aPressed = true;
-        }
-        if (code == KeyEvent.VK_D) {
-            right();
-            dPressed = true;
-        }
-        if (code == KeyEvent.VK_SHIFT) {
-            isRunning = true;
-        }
-
-
-
-    }
-
-    @Override
-    public void keyReleased(KeyEvent e) {
-        int code = e.getKeyCode();
-
-        if (code == KeyEvent.VK_W) {
-            wPressed = false;
-        }
-        if (code == KeyEvent.VK_S) {
-            sPressed = false;
-        }
-        if (code == KeyEvent.VK_A) {
-            aPressed = false;
-        }
-        if (code == KeyEvent.VK_D) {
-            dPressed = false;
-        }
-        if (code == KeyEvent.VK_SHIFT) {
-            isRunning = false;
-        }
-
-        if (!wPressed) {
-            yVelocity = 0;
-        }
-        if (!sPressed) {
-            yVelocity = 0;
-        }
-        if (!aPressed) {
-            xVelocity = 0;
-        }
-        if (!dPressed) {
-            xVelocity = 0;
-        }
-
-        if (!wPressed && !aPressed && !sPressed && !dPressed) {
-            controlsKeyPressed = false;
-            frame = 0;
-        }
-    }
-
 }
-
