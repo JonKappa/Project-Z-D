@@ -15,11 +15,23 @@ public class Player {
         }
     }
 
-    enum Facing { DOWN, UP, LEFT, RIGHT }
+    enum Facing {
+        DOWN(0, 1), DOWN_RIGHT(1, 1), RIGHT(1, 0), UP_RIGHT(1, -1),
+        UP(0, -1), UP_LEFT(-1, -1), LEFT(-1, 0), DOWN_LEFT(-1, 1);
+
+        final int dirX; // the key direction that gives this facing, -1, 0 or 1 like update's dirX and dirY
+        final int dirY;
+
+        Facing(int dirX, int dirY) {
+            this.dirX = dirX;
+            this.dirY = dirY;
+        }
+    }
 
     static final double WALK_SPEED = 70;      // pixels per second
     static final double RUN_SPEED = 140;
     static final double DODGE_SPEED = 200;    // a roll lasts 8 frames x 0.075 s, so it covers about 120 px
+    static final double DIAGONAL_GRACE = 0.1; // seconds a diagonal facing survives one of its two keys being let go
 
     double x;
     double y;
@@ -31,6 +43,8 @@ public class Player {
     private double frameTimer = 0;
     private int dodgeX; // direction of the current roll
     private int dodgeY;
+    private Facing pendingFacing; // straight facing waiting out DIAGONAL_GRACE after a diagonal
+    private double pendingTimer;
     private final int[] frameCounts; // frames in each animation, so the frame number wraps correctly
 
     Player(double x, double y, int width, int height, int[] frameCounts) {
@@ -67,7 +81,7 @@ public class Player {
         if (moving) {
             move(dirX, dirY, running ? RUN_SPEED : WALK_SPEED, dt, maxX, maxY);
         }
-        face(dirX, dirY);
+        face(dirX, dirY, dt);
 
         if (newState != state) {
             state = newState;
@@ -84,14 +98,11 @@ public class Player {
     // rolls the way the keys point, or the way Brad is facing if none are held
     private void startDodge(int dirX, int dirY) {
         if (dirX == 0 && dirY == 0) {
-            switch (facing) {
-                case LEFT: dirX = -1; break;
-                case RIGHT: dirX = 1; break;
-                case UP: dirY = -1; break;
-                default: dirY = 1; break;
-            }
+            dirX = facing.dirX;
+            dirY = facing.dirY;
         }
-        face(dirX, dirY);
+        facing = facingFor(dirX, dirY); // a roll turns straight away, no grace
+        pendingFacing = null;
         dodgeX = dirX;
         dodgeY = dirY;
         state = State.DODGE;
@@ -107,12 +118,41 @@ public class Player {
         y = Math.max(0, Math.min(y, maxY - height));
     }
 
-    // sideways wins on diagonals, since there are no diagonal sprites
-    private void face(int dirX, int dirY) {
-        if (dirX != 0) {
-            facing = dirX < 0 ? Facing.LEFT : Facing.RIGHT;
-        } else if (dirY != 0) {
-            facing = dirY < 0 ? Facing.UP : Facing.DOWN;
+    // Faces the way the keys point; with no keys held Brad keeps his last facing. Nobody lets go
+    // of two keys in the same tick, so going from a diagonal to one of its own straight halves
+    // waits a moment first, otherwise stopping after a diagonal would almost never stay diagonal.
+    private void face(int dirX, int dirY, double dt) {
+        Facing target = facingFor(dirX, dirY);
+        if (target == null) {
+            pendingFacing = null;
+            return;
         }
+        boolean diagonal = facing.dirX != 0 && facing.dirY != 0;
+        boolean halfOfIt = (target.dirX == facing.dirX && target.dirY == 0)
+                || (target.dirY == facing.dirY && target.dirX == 0);
+        if (!diagonal || !halfOfIt) {
+            facing = target;
+            pendingFacing = null;
+            return;
+        }
+        if (pendingFacing != target) {
+            pendingFacing = target;
+            pendingTimer = 0;
+        }
+        pendingTimer += dt;
+        if (pendingTimer >= DIAGONAL_GRACE) {
+            facing = target;
+            pendingFacing = null;
+        }
+    }
+
+    // the facing that matches a key direction, or null when no keys are held
+    private static Facing facingFor(int dirX, int dirY) {
+        for (Facing f : Facing.values()) {
+            if (f.dirX == dirX && f.dirY == dirY) {
+                return f;
+            }
+        }
+        return null;
     }
 }

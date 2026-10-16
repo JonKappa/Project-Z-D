@@ -64,16 +64,19 @@ public class MyPanel extends JPanel implements ActionListener {
 
         g2D.drawImage(backGround, 0, 0, null);
 
-        int direction;
-        switch (player.facing) {
-            case UP: direction = Sprite.UP; break;
-            case DOWN: direction = Sprite.DOWN; break;
-            default: direction = Sprite.SIDE; break;
-        }
+        // the left-side facings have no frames of their own; they draw their right-side twin mirrored
+        int direction = switch (player.facing) {
+            case DOWN -> Sprite.DOWN;
+            case DOWN_RIGHT, DOWN_LEFT -> Sprite.DOWN_RIGHT;
+            case RIGHT, LEFT -> Sprite.RIGHT;
+            case UP_RIGHT, UP_LEFT -> Sprite.UP_RIGHT;
+            case UP -> Sprite.UP;
+        };
+        boolean mirrored = player.facing.dirX < 0;
         BufferedImage img = p.animation[direction][player.state.animationIndex][player.frame];
         int x = (int) player.x;
         int y = (int) player.y;
-        if (player.facing == Player.Facing.LEFT) {
+        if (mirrored) {
             g2D.drawImage(img, x + img.getWidth(), y, -img.getWidth(), img.getHeight(), null);
         }
         else {
