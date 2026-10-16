@@ -4,12 +4,14 @@ package test;
 public class Player {
 
     enum State {
-        IDLE(0), WALK(1), RUN(2);
+        IDLE(0, 0.2), WALK(1, 0.1), RUN(2, 0.1);
 
         final int animationIndex; // index into Sprite.animation
+        final double frameTime;   // seconds each animation frame stays on screen
 
-        State(int animationIndex) {
+        State(int animationIndex, double frameTime) {
             this.animationIndex = animationIndex;
+            this.frameTime = frameTime;
         }
     }
 
@@ -17,7 +19,6 @@ public class Player {
 
     static final double WALK_SPEED = 70;      // pixels per second
     static final double RUN_SPEED = 140;
-    static final double FRAME_TIME = 0.1;     // seconds each animation frame stays on screen
 
     double x;
     double y;
@@ -63,8 +64,8 @@ public class Player {
             frameTimer = 0;
         }
         frameTimer += dt;
-        while (frameTimer >= FRAME_TIME) {
-            frameTimer -= FRAME_TIME;
+        while (frameTimer >= state.frameTime) {
+            frameTimer -= state.frameTime;
             frame = (frame + 1) % frameCounts[state.animationIndex];
         }
     }
