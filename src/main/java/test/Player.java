@@ -87,12 +87,16 @@ public class Player {
         face(dirX, dirY, dt);
 
         if (newState != state) {
+            // walk and run land the same foot on the same frame, so switching between them keeps the step
+            boolean walkRunSwitch = state != State.IDLE && newState != State.IDLE;
             state = newState;
-            // the left-side facings play their strides half a cycle on (see MyPanel), so a stride
-            // starting there starts half a cycle in, and every facing steps off on the same frame
-            boolean mirroredStride = state != State.IDLE && facing.dirX < 0;
-            frame = mirroredStride ? frameCounts[state.animationIndex] / 2 : 0;
-            frameTimer = 0;
+            if (!walkRunSwitch) {
+                // the left-side facings play their strides half a cycle on (see MyPanel), so a stride
+                // starting there starts half a cycle in, and every facing steps off on the same frame
+                boolean mirroredStride = state != State.IDLE && facing.dirX < 0;
+                frame = mirroredStride ? frameCounts[state.animationIndex] / 2 : 0;
+                frameTimer = 0;
+            }
         }
         frameTimer += dt;
         while (frameTimer >= state.frameTime) {
