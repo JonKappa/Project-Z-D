@@ -1,7 +1,11 @@
 package test;
 
-// Brad's position, movement and which animation frame to show. Knows nothing about keys or drawing.
-public class Player {
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+
+// The player's position, movement, animation frame and drawing. Knows nothing about keys:
+// Game reads them and passes them in with control() before each update.
+public class Player extends Entity {
 
     enum State {
         IDLE(0, 0.2), WALK(1, 0.1), RUN(2, 0.1), DODGE(3, 0.075);
@@ -35,11 +39,8 @@ public class Player {
     // (crouch, land, stand up) so they don't skate, fast while diving and rolling; averages 1
     static final double[] DODGE_PACE = {0.4, 1.3, 1.4, 1.4, 1.4, 1.3, 0.6, 0.2};
     static final double DIAGONAL_GRACE = 0.1; // seconds a diagonal facing survives one of its two keys being let go
+    static final int MAX_HEALTH = 100;
 
-    double x;
-    double y;
-    final int width;
-    final int height;
     Facing facing = Facing.DOWN;
     State state = State.IDLE;
     int frame = 0;
@@ -50,16 +51,29 @@ public class Player {
     private double pendingTimer;
     private final int[] frameCounts; // frames in each animation, so the frame number wraps correctly
 
+    // this tick's controls, set by Game before update
+    private int dirX; // -1, 0 or 1
+    private int dirY;
+    private boolean running;
+    private boolean dodgePressed;
+
     Player(double x, double y, int width, int height, int[] frameCounts) {
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
+        super(x, y, width, height, MAX_HEALTH);
         this.frameCounts = frameCounts;
     }
 
-    // dirX and dirY are -1, 0 or 1; dt is seconds since the last update
-    void update(double dt, int dirX, int dirY, boolean running, boolean dodgePressed, int maxX, int maxY) {
+    // dirX and dirY are -1, 0 or 1
+    void control(int dirX, int dirY, boolean running, boolean dodgePressed) {
+        this.dirX = dirX;
+        this.dirY = dirY;
+        this.running = running;
+        this.dodgePressed = dodgePressed;
+    }
+
+    @Override
+    void update(double dt, Game game) {
+        int maxX = Game.WIDTH;
+        int maxY = Game.HEIGHT;
         if (state != State.DODGE && dodgePressed) {
             startDodge(dirX, dirY);
         }
@@ -91,7 +105,7 @@ public class Player {
             boolean walkRunSwitch = state != State.IDLE && newState != State.IDLE;
             state = newState;
             if (!walkRunSwitch) {
-                // the left-side facings play their strides half a cycle on (see MyPanel), so a stride
+                // the left-side facings play their strides half a cycle on (see draw), so a stride
                 // starting there starts half a cycle in, and every facing steps off on the same frame
                 boolean mirroredStride = state != State.IDLE && facing.dirX < 0;
                 frame = mirroredStride ? frameCounts[state.animationIndex] / 2 : 0;
@@ -164,5 +178,34 @@ public class Player {
             }
         }
         return null;
+    }
+
+    @Override
+    void draw(Graphics2D g, Game game) {
+        // the left-side facings have no frames of their own; they draw their right-side twin mirrored
+        int direction = switch (facing) {
+            case DOWN -> Sprite.DOWN;
+            case DOWN_RIGHT, DOWN_LEFT -> Sprite.DOWN_RIGHT;
+            case RIGHT, LEFT -> Sprite.RIGHT;
+            case UP_RIGHT, UP_LEFT -> Sprite.UP_RIGHT;
+            case UP -> Sprite.UP;
+        };
+        boolean mirrored = facing.dirX < 0;
+        BufferedImage[] frames = game.sprites.animation[direction][state.animationIndex];
+        int shown = frame;
+        if (mirrored && (state == State.WALK || state == State.RUN)) {
+            // mirroring swaps which foot is in front, so a mirrored stride is shifted by half a cycle;
+            // that keeps the same foot forward when turning between down and down-left, or up and up-left
+            shown = (shown + frames.length / 2) % frames.length;
+        }
+        BufferedImage img = frames[shown];
+        int drawX = (int) x;
+        int drawY = (int) y;
+        if (mirrored) {
+            g.drawImage(img, drawX + 2 * Sprite.CENTER_X, drawY, -img.getWidth(), img.getHeight(), null);
+        }
+        else {
+            g.drawImage(img, drawX, drawY, img.getWidth(), img.getHeight(), null);
+        }
     }
 }
