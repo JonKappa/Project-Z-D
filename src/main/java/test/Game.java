@@ -69,8 +69,8 @@ public class Game {
     void update(double dt, Input input) {
         switch (screen) {
             case TITLE -> {
+                // Esc does nothing here, so tapping it twice on game over can't close the whole game
                 if (input.wasPressed(KeyEvent.VK_ENTER)) startNewGame();
-                else if (input.wasPressed(KeyEvent.VK_ESCAPE)) System.exit(0);
             }
             case PLAYING -> {
                 if (input.wasPressed(KeyEvent.VK_ESCAPE)) {
@@ -126,7 +126,6 @@ public class Game {
                 shade(g, new Color(0, 0, 0, 160));
                 centredText(g, "PROJECT Z-D", TITLE_FONT, 190);
                 centredText(g, "Enter to play", HINT_FONT, 260);
-                centredText(g, "Esc to quit", HINT_FONT, 290);
             }
             case PLAYING -> { }
             case PAUSED -> {
