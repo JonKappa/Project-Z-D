@@ -60,6 +60,11 @@ public class Game {
         screen = Screen.PLAYING;
     }
 
+    // pauses a game in progress; does nothing on the other screens
+    void pause() {
+        if (screen == Screen.PLAYING) screen = Screen.PAUSED;
+    }
+
     // one step of the game; dt is seconds since the last step
     void update(double dt, Input input) {
         switch (screen) {

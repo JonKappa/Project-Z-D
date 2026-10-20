@@ -23,12 +23,14 @@ public class MyPanel extends JPanel implements ActionListener {
         timer.start();
     }
 
-    // the window calls this once it exists, so keys held while it loses focus don't stay stuck down
+    // the window calls this once it exists, so keys held while it loses focus don't stay stuck down,
+    // and the game pauses instead of carrying on while the player is in another window
     void watchFocus(Window window) {
         window.addWindowFocusListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowLostFocus(java.awt.event.WindowEvent e) {
                 input.releaseAll();
+                game.pause();
             }
         });
     }
