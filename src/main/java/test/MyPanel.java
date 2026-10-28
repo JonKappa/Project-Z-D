@@ -30,11 +30,13 @@ public class MyPanel extends JPanel implements ActionListener {
 
         backGround = createImage("./Sprites/Background/testBackground.png");
 
-        int[] frameCounts = new int[p.animation.length];
+        // every direction has the same number of frames per animation
+        BufferedImage[][] down = p.animation[Sprite.DOWN];
+        int[] frameCounts = new int[down.length];
         for (int a = 0; a < frameCounts.length; a++) {
-            frameCounts[a] = p.animation[a].length;
+            frameCounts[a] = down[a].length;
         }
-        BufferedImage idle = p.animation[Player.State.IDLE.animationIndex][0];
+        BufferedImage idle = down[Player.State.IDLE.animationIndex][0];
         player = new Player(0, 0, idle.getWidth(), idle.getHeight(), frameCounts);
         input = new Input();
 
@@ -62,11 +64,27 @@ public class MyPanel extends JPanel implements ActionListener {
 
         g2D.drawImage(backGround, 0, 0, null);
 
-        BufferedImage img = p.animation[player.state.animationIndex][player.frame];
+        // the left-side facings have no frames of their own; they draw their right-side twin mirrored
+        int direction = switch (player.facing) {
+            case DOWN -> Sprite.DOWN;
+            case DOWN_RIGHT, DOWN_LEFT -> Sprite.DOWN_RIGHT;
+            case RIGHT, LEFT -> Sprite.RIGHT;
+            case UP_RIGHT, UP_LEFT -> Sprite.UP_RIGHT;
+            case UP -> Sprite.UP;
+        };
+        boolean mirrored = player.facing.dirX < 0;
+        BufferedImage[] frames = p.animation[direction][player.state.animationIndex];
+        int frame = player.frame;
+        if (mirrored && (player.state == Player.State.WALK || player.state == Player.State.RUN)) {
+            // mirroring swaps which foot is in front, so a mirrored stride is shifted by half a cycle;
+            // that keeps the same foot forward when turning between down and down-left, or up and up-left
+            frame = (frame + frames.length / 2) % frames.length;
+        }
+        BufferedImage img = frames[frame];
         int x = (int) player.x;
         int y = (int) player.y;
-        if (player.facingLeft) {
-            g2D.drawImage(img, x + img.getWidth(), y, -img.getWidth(), img.getHeight(), null);
+        if (mirrored) {
+            g2D.drawImage(img, x + 2 * Sprite.CENTER_X, y, -img.getWidth(), img.getHeight(), null);
         }
         else {
             g2D.drawImage(img, x, y, img.getWidth(), img.getHeight(), null);
@@ -100,8 +118,9 @@ public class MyPanel extends JPanel implements ActionListener {
         if (input.isDown(KeyEvent.VK_W, KeyEvent.VK_UP)) dirY -= 1;
         if (input.isDown(KeyEvent.VK_S, KeyEvent.VK_DOWN)) dirY += 1;
         boolean running = input.isDown(KeyEvent.VK_SHIFT);
+        boolean dodge = input.wasPressed(KeyEvent.VK_SPACE);
 
-        player.update(dt, dirX, dirY, running, PANEL_WIDTH, PANEL_HEIGHT);
+        player.update(dt, dirX, dirY, running, dodge, PANEL_WIDTH, PANEL_HEIGHT);
 
         input.endTick();
         repaint();

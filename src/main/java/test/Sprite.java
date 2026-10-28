@@ -7,35 +7,41 @@ import java.io.IOException;
 
 public class Sprite {
 
-    BufferedImage[][] animation;
-    BufferedImage[] playerIdle;
-    BufferedImage[] playerWalking;
-    BufferedImage[] playerRunning;
-    BufferedImage[] playerPunch;
+    // which set of frames to draw; the left-side facings reuse the right-side frames mirrored
+    static final int DOWN = 0;
+    static final int DOWN_RIGHT = 1;
+    static final int UP_RIGHT = 2;
+    static final int UP = 3;
+    static final int RIGHT = 4; // the down-right frames, except for its own side-on dodge roll
+
+    // the middle of the character in every frame; the art sits left of the frame's own centre,
+    // so mirroring around this keeps the character in place when it turns left or right
+    static final int CENTER_X = 36;
+
+    BufferedImage[][][] animation; // [direction][animation][frame], animation index is Player.State.animationIndex
 
     Sprite() {
-        playerIdle = new BufferedImage[4];
-        playerWalking = new BufferedImage[8];
-        playerRunning = new BufferedImage[8];
-        playerPunch = new BufferedImage[4];
-        animation = new BufferedImage[4][];
-
-        for (int i = 0; i < playerIdle.length; i++) {
-            playerIdle[i] = createImage("./Sprites/Brad/Idle/idle"+(i+1)+".png");
+        String[] directions = {"Down", "DownRight", "UpRight", "Up"}; // same order as the constants above
+        animation = new BufferedImage[directions.length + 1][][];
+        for (int d = 0; d < directions.length; d++) {
+            String folder = "./Sprites/Survivor/" + directions[d];
+            animation[d] = new BufferedImage[][] {
+                loadFrames(folder + "/Idle/idle", 4),
+                loadFrames(folder + "/Walk/walking", 8),
+                loadFrames(folder + "/Run/run", 8),
+                loadFrames(folder + "/Dodge/dodge", 8),
+            };
         }
-        for (int i = 0; i < playerWalking.length; i++) {
-            playerWalking[i] = createImage("./Sprites/Brad/Walk/walking"+(i+1)+".png");
+        animation[RIGHT] = animation[DOWN_RIGHT].clone();
+        animation[RIGHT][Player.State.DODGE.animationIndex] = loadFrames("./Sprites/Survivor/Right/Dodge/dodge", 8);
+    }
+
+    private BufferedImage[] loadFrames(String prefix, int count) {
+        BufferedImage[] frames = new BufferedImage[count];
+        for (int i = 0; i < count; i++) {
+            frames[i] = createImage(prefix + (i + 1) + ".png");
         }
-        for (int i = 0; i < playerRunning.length; i++) {
-            playerRunning[i] = createImage("./Sprites/Brad/Run/run"+(i+1)+".png");
-        }
-
-        animation[0] = playerIdle;
-        animation[1] = playerWalking;
-        animation[2] = playerRunning;
-        animation[3] = playerPunch;
-
-
+        return frames;
     }
 
     private BufferedImage createImage(String filename){

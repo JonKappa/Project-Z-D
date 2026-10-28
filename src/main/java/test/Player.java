@@ -4,27 +4,50 @@ package test;
 public class Player {
 
     enum State {
-        IDLE(0), WALK(1), RUN(2);
+        IDLE(0, 0.2), WALK(1, 0.1), RUN(2, 0.1), DODGE(3, 0.075);
 
         final int animationIndex; // index into Sprite.animation
+        final double frameTime;   // seconds each animation frame stays on screen
 
-        State(int animationIndex) {
+        State(int animationIndex, double frameTime) {
             this.animationIndex = animationIndex;
+            this.frameTime = frameTime;
+        }
+    }
+
+    enum Facing {
+        DOWN(0, 1), DOWN_RIGHT(1, 1), RIGHT(1, 0), UP_RIGHT(1, -1),
+        UP(0, -1), UP_LEFT(-1, -1), LEFT(-1, 0), DOWN_LEFT(-1, 1);
+
+        final int dirX; // the key direction that gives this facing, -1, 0 or 1 like update's dirX and dirY
+        final int dirY;
+
+        Facing(int dirX, int dirY) {
+            this.dirX = dirX;
+            this.dirY = dirY;
         }
     }
 
     static final double WALK_SPEED = 70;      // pixels per second
     static final double RUN_SPEED = 140;
-    static final double FRAME_TIME = 0.1;     // seconds each animation frame stays on screen
+    static final double DODGE_SPEED = 200;    // a roll lasts 8 frames x 0.075 s, so it covers about 120 px
+    // speed of each dodge frame as a share of DODGE_SPEED: slow while the boots are planted
+    // (crouch, land, stand up) so they don't skate, fast while diving and rolling; averages 1
+    static final double[] DODGE_PACE = {0.4, 1.3, 1.4, 1.4, 1.4, 1.3, 0.6, 0.2};
+    static final double DIAGONAL_GRACE = 0.1; // seconds a diagonal facing survives one of its two keys being let go
 
     double x;
     double y;
     final int width;
     final int height;
-    boolean facingLeft = false;
+    Facing facing = Facing.DOWN;
     State state = State.IDLE;
     int frame = 0;
     private double frameTimer = 0;
+    private int dodgeX; // direction of the current roll
+    private int dodgeY;
+    private Facing pendingFacing; // straight facing waiting out DIAGONAL_GRACE after a diagonal
+    private double pendingTimer;
     private final int[] frameCounts; // frames in each animation, so the frame number wraps correctly
 
     Player(double x, double y, int width, int height, int[] frameCounts) {
@@ -36,31 +59,110 @@ public class Player {
     }
 
     // dirX and dirY are -1, 0 or 1; dt is seconds since the last update
-    void update(double dt, int dirX, int dirY, boolean running, int maxX, int maxY) {
+    void update(double dt, int dirX, int dirY, boolean running, boolean dodgePressed, int maxX, int maxY) {
+        if (state != State.DODGE && dodgePressed) {
+            startDodge(dirX, dirY);
+        }
+        if (state == State.DODGE) {
+            move(dodgeX, dodgeY, DODGE_SPEED * DODGE_PACE[frame], dt, maxX, maxY);
+            frameTimer += dt;
+            while (frameTimer >= state.frameTime) {
+                frameTimer -= state.frameTime;
+                frame++;
+            }
+            if (frame < frameCounts[state.animationIndex]) {
+                return; // a roll can't be steered or cancelled once it starts
+            }
+            state = State.IDLE; // roll finished; fall through and pick up whatever keys are held now
+            frame = 0;
+            frameTimer = 0;
+        }
+
         boolean moving = dirX != 0 || dirY != 0;
         State newState = !moving ? State.IDLE : running ? State.RUN : State.WALK;
 
         if (moving) {
-            double speed = running ? RUN_SPEED : WALK_SPEED;
-            double length = Math.sqrt(dirX * dirX + dirY * dirY); // keeps diagonals the same speed as straight lines
-            x += dirX / length * speed * dt;
-            y += dirY / length * speed * dt;
-            x = Math.max(0, Math.min(x, maxX - width));
-            y = Math.max(0, Math.min(y, maxY - height));
+            move(dirX, dirY, running ? RUN_SPEED : WALK_SPEED, dt, maxX, maxY);
         }
-        if (dirX != 0) {
-            facingLeft = dirX < 0;
-        }
+        face(dirX, dirY, dt);
 
         if (newState != state) {
+            // walk and run land the same foot on the same frame, so switching between them keeps the step
+            boolean walkRunSwitch = state != State.IDLE && newState != State.IDLE;
             state = newState;
-            frame = 0;
-            frameTimer = 0;
+            if (!walkRunSwitch) {
+                // the left-side facings play their strides half a cycle on (see MyPanel), so a stride
+                // starting there starts half a cycle in, and every facing steps off on the same frame
+                boolean mirroredStride = state != State.IDLE && facing.dirX < 0;
+                frame = mirroredStride ? frameCounts[state.animationIndex] / 2 : 0;
+                frameTimer = 0;
+            }
         }
         frameTimer += dt;
-        while (frameTimer >= FRAME_TIME) {
-            frameTimer -= FRAME_TIME;
+        while (frameTimer >= state.frameTime) {
+            frameTimer -= state.frameTime;
             frame = (frame + 1) % frameCounts[state.animationIndex];
         }
+    }
+
+    // rolls the way the keys point, or the way Brad is facing if none are held
+    private void startDodge(int dirX, int dirY) {
+        if (dirX == 0 && dirY == 0) {
+            dirX = facing.dirX;
+            dirY = facing.dirY;
+        }
+        facing = facingFor(dirX, dirY); // a roll turns straight away, no grace
+        pendingFacing = null;
+        dodgeX = dirX;
+        dodgeY = dirY;
+        state = State.DODGE;
+        frame = 0;
+        frameTimer = 0;
+    }
+
+    private void move(int dirX, int dirY, double speed, double dt, int maxX, int maxY) {
+        double length = Math.sqrt(dirX * dirX + dirY * dirY); // keeps diagonals the same speed as straight lines
+        x += dirX / length * speed * dt;
+        y += dirY / length * speed * dt;
+        x = Math.max(0, Math.min(x, maxX - width));
+        y = Math.max(0, Math.min(y, maxY - height));
+    }
+
+    // Faces the way the keys point; with no keys held Brad keeps his last facing. Nobody lets go
+    // of two keys in the same tick, so going from a diagonal to one of its own straight halves
+    // waits a moment first, otherwise stopping after a diagonal would almost never stay diagonal.
+    private void face(int dirX, int dirY, double dt) {
+        Facing target = facingFor(dirX, dirY);
+        if (target == null) {
+            pendingFacing = null;
+            return;
+        }
+        boolean diagonal = facing.dirX != 0 && facing.dirY != 0;
+        boolean halfOfIt = (target.dirX == facing.dirX && target.dirY == 0)
+                || (target.dirY == facing.dirY && target.dirX == 0);
+        if (!diagonal || !halfOfIt) {
+            facing = target;
+            pendingFacing = null;
+            return;
+        }
+        if (pendingFacing != target) {
+            pendingFacing = target;
+            pendingTimer = 0;
+        }
+        pendingTimer += dt;
+        if (pendingTimer >= DIAGONAL_GRACE) {
+            facing = target;
+            pendingFacing = null;
+        }
+    }
+
+    // the facing that matches a key direction, or null when no keys are held
+    private static Facing facingFor(int dirX, int dirY) {
+        for (Facing f : Facing.values()) {
+            if (f.dirX == dirX && f.dirY == dirY) {
+                return f;
+            }
+        }
+        return null;
     }
 }
