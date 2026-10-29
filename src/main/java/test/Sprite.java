@@ -27,7 +27,6 @@ public class Sprite {
             String folder = "./Sprites/Survivor/" + directions[d];
             animation[d] = new BufferedImage[][] {
                 loadFrames(folder + "/Idle/idle", 4),
-                loadFrames(folder + "/Walk/walking", 8),
                 loadFrames(folder + "/Run/run", 8),
                 loadFrames(folder + "/Dodge/dodge", 8),
             };
