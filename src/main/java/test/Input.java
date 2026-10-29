@@ -7,10 +7,17 @@ import java.util.HashSet;
 import java.util.Set;
 
 // Tracks which keys are held. Listens at the window level, so it works no matter which component has focus.
+// Also tracks the mouse, in game coordinates (0-640, 0-480), as reported by the panel.
 public class Input implements KeyEventDispatcher {
 
     private final Set<Integer> held = new HashSet<>();
     private final Set<Integer> pressedThisTick = new HashSet<>();
+
+    int mouseX = -1; // -1 until the mouse first moves over the game
+    int mouseY = -1;
+    boolean mouseDown;          // left button held
+    private boolean mouseMovedThisTick;
+    private boolean clickedThisTick; // left button went down this tick
 
     Input() {
         KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(this);
@@ -40,19 +47,55 @@ public class Input implements KeyEventDispatcher {
         return false;
     }
 
-    // true once per press, for toggles and one-shot actions like attacks
-    boolean wasPressed(int code) {
-        return pressedThisTick.contains(code);
+    // true once per press of any of the given keys, for toggles and one-shot actions like attacks
+    boolean wasPressed(int... codes) {
+        for (int code : codes) {
+            if (pressedThisTick.contains(code)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // the panel calls these from its mouse listeners, already turned into game coordinates
+    void mouseMoved(int x, int y) {
+        mouseX = x;
+        mouseY = y;
+        mouseMovedThisTick = true;
+    }
+
+    void mousePressed(int x, int y) {
+        mouseMoved(x, y);
+        mouseDown = true;
+        clickedThisTick = true;
+    }
+
+    void mouseReleased() {
+        mouseDown = false;
+    }
+
+    // true if the mouse moved since the last tick, so menus only follow it when it's actually used
+    boolean mouseMoved() {
+        return mouseMovedThisTick;
+    }
+
+    // true once per left click
+    boolean wasClicked() {
+        return clickedThisTick;
     }
 
     // call at the end of every game tick
     void endTick() {
         pressedThisTick.clear();
+        mouseMovedThisTick = false;
+        clickedThisTick = false;
     }
 
     // stops keys getting stuck down when the window loses focus mid-press
     void releaseAll() {
         held.clear();
         pressedThisTick.clear();
+        mouseDown = false;
+        clickedThisTick = false;
     }
 }

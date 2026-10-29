@@ -3,124 +3,113 @@ package test;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import javax.imageio.ImageIO;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import javax.swing.*;
 
-
+// The window's drawing surface. Runs the game loop on a Swing timer and draws whatever Game holds,
+// scaled up to fill the panel, with black bars if the panel isn't the game's 4:3 shape.
 public class MyPanel extends JPanel implements ActionListener {
 
-    BufferedImage backGround;
-    final int PANEL_WIDTH = 640;
-    final int PANEL_HEIGHT = 480;
-    Timer timer;
+    final Game game;
+    final Input input;
+    final Timer timer;
     long lastTickTime;
-    Sprite p;
-    Player player;
-    Input input;
 
-
-
-    MyPanel(){
-        p = new Sprite();
-        this.setPreferredSize(new Dimension(PANEL_WIDTH,PANEL_HEIGHT));
-
-        backGround = createImage("./Sprites/Background/testBackground.png");
-
-        // every direction has the same number of frames per animation
-        BufferedImage[][] down = p.animation[Sprite.DOWN];
-        int[] frameCounts = new int[down.length];
-        for (int a = 0; a < frameCounts.length; a++) {
-            frameCounts[a] = down[a].length;
-        }
-        BufferedImage idle = down[Player.State.IDLE.animationIndex][0];
-        player = new Player(0, 0, idle.getWidth(), idle.getHeight(), frameCounts);
+    MyPanel() {
+        this.setPreferredSize(new Dimension(Game.WIDTH, Game.HEIGHT));
+        this.setBackground(Color.BLACK);
+        game = new Game();
         input = new Input();
+        listenToMouse();
 
         lastTickTime = System.nanoTime();
         timer = new Timer(16, this); // about 60 updates a second
         timer.start();
     }
 
-    // the window calls this once it exists, so keys held while it loses focus don't stay stuck down
+    // how much the game is scaled up to fill the panel
+    private double scale() {
+        return Math.min(getWidth() / (double) Game.WIDTH, getHeight() / (double) Game.HEIGHT);
+    }
+
+    // where the game's top-left corner sits in the panel, after centring it between the black bars
+    private double offsetX() {
+        return (getWidth() - Game.WIDTH * scale()) / 2;
+    }
+
+    private double offsetY() {
+        return (getHeight() - Game.HEIGHT * scale()) / 2;
+    }
+
+    // passes the mouse to Input, turned from panel pixels into game pixels
+    private void listenToMouse() {
+        MouseAdapter mouse = new MouseAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                input.mouseMoved(gameX(e), gameY(e));
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                input.mouseMoved(gameX(e), gameY(e));
+            }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (e.getButton() == MouseEvent.BUTTON1) input.mousePressed(gameX(e), gameY(e));
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (e.getButton() == MouseEvent.BUTTON1) input.mouseReleased();
+            }
+        };
+        addMouseListener(mouse);
+        addMouseMotionListener(mouse);
+    }
+
+    private int gameX(MouseEvent e) {
+        return (int) Math.floor((e.getX() - offsetX()) / scale());
+    }
+
+    private int gameY(MouseEvent e) {
+        return (int) Math.floor((e.getY() - offsetY()) / scale());
+    }
+
+    // the window calls this once it exists, so keys held while it loses focus don't stay stuck down,
+    // and the game pauses instead of carrying on while the player is in another window
     void watchFocus(Window window) {
         window.addWindowFocusListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowLostFocus(java.awt.event.WindowEvent e) {
                 input.releaseAll();
+                game.pause();
             }
         });
     }
 
-
     @Override
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-
-        Graphics2D g2D = (Graphics2D) g;
-
-        g2D.drawImage(backGround, 0, 0, null);
-
-        // the left-side facings have no frames of their own; they draw their right-side twin mirrored
-        int direction = switch (player.facing) {
-            case DOWN -> Sprite.DOWN;
-            case DOWN_RIGHT, DOWN_LEFT -> Sprite.DOWN_RIGHT;
-            case RIGHT, LEFT -> Sprite.RIGHT;
-            case UP_RIGHT, UP_LEFT -> Sprite.UP_RIGHT;
-            case UP -> Sprite.UP;
-        };
-        boolean mirrored = player.facing.dirX < 0;
-        BufferedImage[] frames = p.animation[direction][player.state.animationIndex];
-        int frame = player.frame;
-        if (mirrored && (player.state == Player.State.WALK || player.state == Player.State.RUN)) {
-            // mirroring swaps which foot is in front, so a mirrored stride is shifted by half a cycle;
-            // that keeps the same foot forward when turning between down and down-left, or up and up-left
-            frame = (frame + frames.length / 2) % frames.length;
-        }
-        BufferedImage img = frames[frame];
-        int x = (int) player.x;
-        int y = (int) player.y;
-        if (mirrored) {
-            g2D.drawImage(img, x + 2 * Sprite.CENTER_X, y, -img.getWidth(), img.getHeight(), null);
-        }
-        else {
-            g2D.drawImage(img, x, y, img.getWidth(), img.getHeight(), null);
-        }
+        super.paintComponent(g); // fills the panel black, which leaves the bars
+        Graphics2D g2D = (Graphics2D) g.create();
+        // nearest neighbour keeps the pixel art sharp instead of blurring it when scaled up
+        g2D.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g2D.translate(offsetX(), offsetY());
+        g2D.scale(scale(), scale());
+        g2D.clipRect(0, 0, Game.WIDTH, Game.HEIGHT);
+        game.draw(g2D);
+        g2D.dispose();
     }
 
-
-    private BufferedImage createImage(String filename){
-        BufferedImage bufferedImage;
-        try {
-            bufferedImage = ImageIO.read(new File(filename));
-            return bufferedImage;
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    // one game tick: read the keys, move the player, then redraw
+    // one game tick: update the world, then redraw
     @Override
     public void actionPerformed(ActionEvent e) {
         long now = System.nanoTime();
-        double dt = Math.min((now - lastTickTime) / 1_000_000_000.0, 0.05); // cap it so a hiccup can't teleport Brad
+        double dt = Math.min((now - lastTickTime) / 1_000_000_000.0, 0.05); // cap it so a hiccup can't teleport the player
         lastTickTime = now;
 
-        // holding both opposite keys cancels out instead of one silently winning
-        int dirX = 0;
-        int dirY = 0;
-        if (input.isDown(KeyEvent.VK_A, KeyEvent.VK_LEFT)) dirX -= 1;
-        if (input.isDown(KeyEvent.VK_D, KeyEvent.VK_RIGHT)) dirX += 1;
-        if (input.isDown(KeyEvent.VK_W, KeyEvent.VK_UP)) dirY -= 1;
-        if (input.isDown(KeyEvent.VK_S, KeyEvent.VK_DOWN)) dirY += 1;
-        boolean running = input.isDown(KeyEvent.VK_SHIFT);
-        boolean dodge = input.wasPressed(KeyEvent.VK_SPACE);
-
-        player.update(dt, dirX, dirY, running, dodge, PANEL_WIDTH, PANEL_HEIGHT);
+        game.update(dt, input);
 
         input.endTick();
         repaint();
