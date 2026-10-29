@@ -19,8 +19,10 @@ import javax.imageio.ImageIO;
 // Knows nothing about Swing timers or windows.
 public class Game {
 
-    static final int WIDTH = 640;
-    static final int HEIGHT = 480;
+    // the game's own resolution, 16:9; the window scales it up, exactly 2x on a 1920 x 1080 screen.
+    // Menus and text are laid out in this size, and the view is never smaller than it.
+    static final int WIDTH = 960;
+    static final int HEIGHT = 540;
 
     enum Screen { TITLE, PLAYING, PAUSED, GAME_OVER, CONTROLS, SETTINGS }
 
@@ -45,6 +47,10 @@ public class Game {
     private final int playerWidth;
     private final int playerHeight;
     Player player;
+    // how much the screen shows, in game pixels: WIDTH x HEIGHT in a 16:9 window, and wider or taller
+    // in any other shape (a maximized window, say), so the window is filled instead of showing black bars
+    int viewWidth = WIDTH;
+    int viewHeight = HEIGHT;
     Screen screen = Screen.TITLE;
     Runnable onDisplayChange = () -> { }; // the window sets this to re-apply fullscreen and window size
     private final Map<Screen, Menu> menus;
@@ -66,22 +72,22 @@ public class Game {
         playerHeight = idle.getHeight();
 
         menus = Map.of(
-            Screen.TITLE, new Menu(230, List.of(
+            Screen.TITLE, new Menu(260, List.of(
                 new Menu.Item("Play", this::startNewGame),
                 new Menu.Item("Controls", () -> openFrom(Screen.CONTROLS)),
                 new Menu.Item("Settings", () -> openFrom(Screen.SETTINGS)),
                 new Menu.Item("Quit", () -> System.exit(0)))),
-            Screen.PAUSED, new Menu(230, List.of(
+            Screen.PAUSED, new Menu(260, List.of(
                 new Menu.Item("Resume", () -> show(Screen.PLAYING)),
                 new Menu.Item("Controls", () -> openFrom(Screen.CONTROLS)),
                 new Menu.Item("Settings", () -> openFrom(Screen.SETTINGS)),
                 new Menu.Item("Quit to title", () -> show(Screen.TITLE)))),
-            Screen.GAME_OVER, new Menu(230, List.of(
+            Screen.GAME_OVER, new Menu(260, List.of(
                 new Menu.Item("Play again", this::startNewGame),
                 new Menu.Item("Title screen", () -> show(Screen.TITLE)))),
-            Screen.CONTROLS, new Menu(390, List.of(
+            Screen.CONTROLS, new Menu(420, List.of(
                 new Menu.Item("Back", () -> goBack()))),
-            Screen.SETTINGS, new Menu(150, 380, List.of(
+            Screen.SETTINGS, new Menu(180, 380, List.of(
                 Menu.Item.setting(() -> "Fullscreen: " + (settings.fullscreen ? "On" : "Off"), dir -> {
                     settings.fullscreen = !settings.fullscreen;
                     settings.save();
@@ -99,6 +105,24 @@ public class Game {
                 Menu.Item.slider("Effects volume", () -> settings.effectsVolume,
                         v -> { settings.effectsVolume = v; settings.save(); }, Settings.VOLUME_STEP),
                 new Menu.Item("Back", () -> goBack()))));
+    }
+
+    // the panel calls this when the window changes shape; menus and text stay centred in the new view
+    void resizeView(int width, int height) {
+        viewWidth = Math.max(width, WIDTH);
+        viewHeight = Math.max(height, HEIGHT);
+        for (Menu menu : menus.values()) {
+            menu.moveTo(uiX(), uiY());
+        }
+    }
+
+    // where the WIDTH x HEIGHT box that menus and text are laid out in sits, centred in the view
+    private int uiX() {
+        return (viewWidth - WIDTH) / 2;
+    }
+
+    private int uiY() {
+        return (viewHeight - HEIGHT) / 2;
     }
 
     // opens a screen reached from the title or pause menu, remembering which one to go back to
@@ -129,7 +153,7 @@ public class Game {
     // clears the world and puts a fresh player in the middle of the screen
     void startNewGame() {
         entities.clear();
-        player = new Player((WIDTH - playerWidth) / 2.0, (HEIGHT - playerHeight) / 2.0,
+        player = new Player((viewWidth - playerWidth) / 2.0, (viewHeight - playerHeight) / 2.0,
                 playerWidth, playerHeight, playerFrameCounts);
         entities.add(player);
         show(Screen.PLAYING);
@@ -185,7 +209,7 @@ public class Game {
     }
 
     void draw(Graphics2D g) {
-        g.drawImage(background, 0, 0, null);
+        drawBackground(g);
         if (inGame()) {
             entities.sort(Comparator.comparingDouble(Entity::depth));
             for (Entity entity : entities) {
@@ -193,40 +217,53 @@ public class Game {
             }
         }
 
+        // the shading covers the whole view; the text goes in the centred WIDTH x HEIGHT box
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        Graphics2D ui = (Graphics2D) g.create();
+        ui.translate(uiX(), uiY());
         switch (screen) {
             case TITLE -> {
                 shade(g, new Color(0, 0, 0, 160));
-                centredText(g, "PROJECT Z-D", TITLE_FONT, 190);
+                centredText(ui, "PROJECT Z-D", TITLE_FONT, 220);
             }
             case PLAYING -> { }
             case PAUSED -> {
                 shade(g, new Color(0, 0, 0, 140));
-                centredText(g, "PAUSED", HEADING_FONT, 190);
+                centredText(ui, "PAUSED", HEADING_FONT, 220);
             }
             case GAME_OVER -> {
                 shade(g, new Color(90, 0, 0, 170));
-                centredText(g, "YOU DIED", HEADING_FONT, 190);
+                centredText(ui, "YOU DIED", HEADING_FONT, 220);
             }
             case CONTROLS -> {
                 shade(g, new Color(0, 0, 0, 170));
-                centredText(g, "CONTROLS", HEADING_FONT, 90);
-                drawControls(g);
+                centredText(ui, "CONTROLS", HEADING_FONT, 120);
+                drawControls(ui);
             }
             case SETTINGS -> {
                 shade(g, new Color(0, 0, 0, 170));
-                centredText(g, "SETTINGS", HEADING_FONT, 90);
+                centredText(ui, "SETTINGS", HEADING_FONT, 120);
             }
         }
+        ui.dispose();
         Menu menu = menus.get(screen);
         if (menu != null) menu.draw(g);
+    }
+
+    // the test image is 640 x 480, so it's scaled to cover the whole view and centred, cropping what doesn't fit
+    private void drawBackground(Graphics2D g) {
+        if (background == null) return;
+        double cover = Math.max(viewWidth / (double) background.getWidth(), viewHeight / (double) background.getHeight());
+        int w = (int) Math.ceil(background.getWidth() * cover);
+        int h = (int) Math.ceil(background.getHeight() * cover);
+        g.drawImage(background, (viewWidth - w) / 2, (viewHeight - h) / 2, w, h, null);
     }
 
     // the action names right-aligned to the middle of the screen, the keys left-aligned after them
     private static void drawControls(Graphics2D g) {
         int middle = WIDTH / 2 - 70;
         for (int i = 0; i < CONTROLS.length; i++) {
-            int y = 150 + i * 40;
+            int y = 180 + i * 40;
             g.setFont(TEXT_BOLD_FONT);
             FontMetrics metrics = g.getFontMetrics();
             shadowText(g, CONTROLS[i][0], middle - metrics.stringWidth(CONTROLS[i][0]), y, Color.WHITE);
@@ -235,9 +272,9 @@ public class Game {
         }
     }
 
-    private static void shade(Graphics2D g, Color color) {
+    private void shade(Graphics2D g, Color color) {
         g.setColor(color);
-        g.fillRect(0, 0, WIDTH, HEIGHT);
+        g.fillRect(0, 0, viewWidth, viewHeight);
     }
 
     // draws text centred across the screen with its baseline at y, with a drop shadow so it reads on any background

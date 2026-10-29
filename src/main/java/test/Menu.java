@@ -67,6 +67,9 @@ public class Menu {
     private final Rectangle[] bounds;
     int selected = 0;
     private int dragging = -1; // the slider being dragged with the mouse, or -1
+    // where the game's WIDTH x HEIGHT layout box sits on screen, so the menu stays centred in a wider or taller view
+    private int originX = 0;
+    private int originY = 0;
 
     // top is the y of the first button; the column is centred across the screen
     Menu(int top, List<Item> items) {
@@ -80,6 +83,11 @@ public class Menu {
         for (int i = 0; i < items.size(); i++) {
             bounds[i] = new Rectangle(x, top + i * (BUTTON_HEIGHT + BUTTON_GAP), width, BUTTON_HEIGHT);
         }
+    }
+
+    void moveTo(int x, int y) {
+        originX = x;
+        originY = y;
     }
 
     // a menu always opens with its first button highlighted
@@ -99,20 +107,24 @@ public class Menu {
             if (input.wasPressed(KeyEvent.VK_RIGHT, KeyEvent.VK_D)) current.onAdjust.accept(1);
         }
 
+        // the mouse in the menu's own layout coordinates
+        int mouseX = input.mouseX - originX;
+        int mouseY = input.mouseY - originY;
+
         // the mouse only takes the highlight when it moves, so it can't fight the arrow keys while it sits still
-        int hovered = itemAt(input.mouseX, input.mouseY);
+        int hovered = itemAt(mouseX, mouseY);
         if (hovered >= 0 && dragging < 0 && (input.mouseMoved() || input.wasClicked())) selected = hovered;
 
         // only a click on the bar itself (with a little slack) grabs a slider; a click on its label just highlights it
         if (input.wasClicked() && hovered >= 0 && items.get(hovered).sliderSet != null) {
             Rectangle grab = sliderTrack(bounds[hovered]);
             grab.grow(6, 12);
-            if (grab.contains(input.mouseX, input.mouseY)) dragging = hovered;
+            if (grab.contains(mouseX, mouseY)) dragging = hovered;
         }
         if (dragging >= 0) {
             if (input.mouseDown) {
                 Rectangle track = sliderTrack(bounds[dragging]);
-                double share = (input.mouseX - track.x) / (double) track.width;
+                double share = (mouseX - track.x) / (double) track.width;
                 int value = (int) Math.round(Math.max(0, Math.min(1, share)) * 100);
                 if (value != items.get(dragging).sliderValue.getAsInt()) items.get(dragging).sliderSet.accept(value);
             } else {
@@ -140,7 +152,9 @@ public class Menu {
                 SLIDER_WIDTH, 8);
     }
 
-    void draw(Graphics2D g) {
+    void draw(Graphics2D screen) {
+        Graphics2D g = (Graphics2D) screen.create();
+        g.translate(originX, originY);
         g.setFont(LABEL_FONT);
         FontMetrics metrics = g.getFontMetrics();
         for (int i = 0; i < items.size(); i++) {
@@ -170,6 +184,6 @@ public class Menu {
                 g.drawString(value, track.x - 10 - metrics.stringWidth(value), textY);
             }
         }
-        g.setStroke(new BasicStroke(1));
+        g.dispose();
     }
 }
