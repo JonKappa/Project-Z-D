@@ -97,6 +97,20 @@ public class TileMap {
         return tiles[row][col];
     }
 
+    // true if any solid tile overlaps the box from (left, top) up to, but not including, (right, bottom)
+    boolean blocked(double left, double top, double right, double bottom) {
+        int firstCol = (int) Math.floor(left / TILE);
+        int lastCol = (int) Math.floor((right - 0.001) / TILE);
+        int firstRow = (int) Math.floor(top / TILE);
+        int lastRow = (int) Math.floor((bottom - 0.001) / TILE);
+        for (int row = firstRow; row <= lastRow; row++) {
+            for (int col = firstCol; col <= lastCol; col++) {
+                if (at(col, row).solid) return true;
+            }
+        }
+        return false;
+    }
+
     int pixelWidth() {
         return cols * TILE;
     }
