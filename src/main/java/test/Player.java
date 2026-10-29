@@ -39,6 +39,13 @@ public class Player extends Entity {
     static final double[] DODGE_PACE = {0.4, 1.3, 1.4, 1.4, 1.4, 1.3, 0.6, 0.2};
     static final double DIAGONAL_GRACE = 0.1; // seconds a diagonal facing survives one of its two keys being let go
     static final int MAX_HEALTH = 100;
+    // where the feet are in the sprite frame: the middle of the character, just above the bottom of the boots
+    static final int FEET_X = Sprite.CENTER_X;
+    static final int FEET_Y = 75;
+    // the box around the feet that bumps into walls; only the feet collide, so the head and body
+    // can overlap a wall above them, which is how a top-down 3/4 view looks right
+    static final int FEET_HALF_WIDTH = 12;
+    static final int FEET_HEIGHT = 10;
 
     Facing facing = Facing.DOWN;
     State state = State.IDLE;
@@ -60,6 +67,12 @@ public class Player extends Entity {
         this.frameCounts = frameCounts;
     }
 
+    // sorted by the feet, so the player goes behind a wall or sprite that stands in front of where they stand
+    @Override
+    double depth() {
+        return y + FEET_Y;
+    }
+
     // dirX and dirY are -1, 0 or 1
     void control(int dirX, int dirY, boolean dodgePressed) {
         this.dirX = dirX;
@@ -69,13 +82,12 @@ public class Player extends Entity {
 
     @Override
     void update(double dt, Game game) {
-        int maxX = game.viewWidth;
-        int maxY = game.viewHeight;
+        TileMap map = game.map;
         if (state != State.DODGE && dodgePressed) {
             startDodge(dirX, dirY);
         }
         if (state == State.DODGE) {
-            move(dodgeX, dodgeY, DODGE_SPEED * DODGE_PACE[frame], dt, maxX, maxY);
+            move(dodgeX, dodgeY, DODGE_SPEED * DODGE_PACE[frame], dt, map);
             frameTimer += dt;
             while (frameTimer >= state.frameTime) {
                 frameTimer -= state.frameTime;
@@ -93,7 +105,7 @@ public class Player extends Entity {
         State newState = moving ? State.RUN : State.IDLE;
 
         if (moving) {
-            move(dirX, dirY, RUN_SPEED, dt, maxX, maxY);
+            move(dirX, dirY, RUN_SPEED, dt, map);
         }
         face(dirX, dirY, dt);
 
@@ -127,12 +139,35 @@ public class Player extends Entity {
         frameTimer = 0;
     }
 
-    private void move(int dirX, int dirY, double speed, double dt, int maxX, int maxY) {
+    // Moves along each axis separately, so pushing diagonally into a wall slides along it instead of
+    // stopping dead. Each axis goes at most a pixel at a time and stops at the first pixel that would
+    // put the feet inside a solid tile, so the player ends up right against the wall.
+    private void move(int dirX, int dirY, double speed, double dt, TileMap map) {
         double length = Math.sqrt(dirX * dirX + dirY * dirY); // keeps diagonals the same speed as straight lines
-        x += dirX / length * speed * dt;
-        y += dirY / length * speed * dt;
-        x = Math.max(0, Math.min(x, maxX - width));
-        y = Math.max(0, Math.min(y, maxY - height));
+        double dx = dirX / length * speed * dt;
+        double dy = dirY / length * speed * dt;
+        x = slide(x, dx, true, map);
+        y = slide(y, dy, false, map);
+    }
+
+    private double slide(double from, double distance, boolean horizontal, TileMap map) {
+        double at = from;
+        double left = Math.abs(distance);
+        double sign = Math.signum(distance);
+        while (left > 0) {
+            double next = at + sign * Math.min(1, left);
+            if (horizontal ? feetBlocked(map, next, y) : feetBlocked(map, x, next)) break;
+            at = next;
+            left -= 1;
+        }
+        return at;
+    }
+
+    // true if the feet would overlap a solid tile with the sprite's top-left corner at (atX, atY)
+    private static boolean feetBlocked(TileMap map, double atX, double atY) {
+        double footX = atX + FEET_X;
+        double footY = atY + FEET_Y;
+        return map.blocked(footX - FEET_HALF_WIDTH, footY - FEET_HEIGHT, footX + FEET_HALF_WIDTH, footY);
     }
 
     // Faces the way the keys point; with no keys held Brad keeps his last facing. Nobody lets go
@@ -192,8 +227,9 @@ public class Player extends Entity {
             shown = (shown + frames.length / 2) % frames.length;
         }
         BufferedImage img = frames[shown];
-        int drawX = (int) x;
-        int drawY = (int) y;
+        // the nearest whole pixel, the same one the camera follows
+        int drawX = (int) Math.round(x);
+        int drawY = (int) Math.round(y);
         if (mirrored) {
             g.drawImage(img, drawX + 2 * Sprite.CENTER_X, drawY, -img.getWidth(), img.getHeight(), null);
         }

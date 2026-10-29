@@ -16,6 +16,9 @@ public class MyPanel extends JPanel implements ActionListener {
     final Input input;
     final Timer timer;
     long lastTickTime;
+    // the world is drawn into this at one game pixel per pixel, then scaled up to the panel in one piece;
+    // scaling each tile on its own leaves thin seams between tiles on some graphics cards
+    private Image worldImage;
 
     MyPanel() {
         this.setPreferredSize(new Dimension(Game.WIDTH, Game.HEIGHT));
@@ -96,8 +99,21 @@ public class MyPanel extends JPanel implements ActionListener {
         g2D.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         g2D.scale(scale(), scale());
         g2D.clipRect(0, 0, game.viewWidth, game.viewHeight);
-        game.draw(g2D);
+        g2D.drawImage(drawWorld(), 0, 0, null);
+        game.drawOverlay(g2D);
         g2D.dispose();
+    }
+
+    // draws the world into worldImage, remaking it whenever the view changes size
+    private Image drawWorld() {
+        if (worldImage == null || worldImage.getWidth(null) != game.viewWidth
+                || worldImage.getHeight(null) != game.viewHeight) {
+            worldImage = getGraphicsConfiguration().createCompatibleImage(game.viewWidth, game.viewHeight);
+        }
+        Graphics2D g = (Graphics2D) worldImage.getGraphics();
+        game.drawWorld(g);
+        g.dispose();
+        return worldImage;
     }
 
     // one game tick: update the world, then redraw
