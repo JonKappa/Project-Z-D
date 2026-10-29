@@ -16,7 +16,7 @@ public class Settings {
     static final int MAX_WINDOW_SCALE = 3;
 
     boolean fullscreen = false;
-    int windowScale = 1; // the window is 640 x 480 times this, shrunk if the screen is too small
+    int windowScale = 1; // the window is the game's resolution times this, shrunk if the screen is too small
 
     // 0 to 100; nothing plays sound yet, these are ready for when it does
     int musicVolume = 80;

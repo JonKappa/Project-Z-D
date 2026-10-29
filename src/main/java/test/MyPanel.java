@@ -8,7 +8,7 @@ import java.awt.event.MouseEvent;
 import javax.swing.*;
 
 // The window's drawing surface. Runs the game loop on a Swing timer and draws whatever Game holds,
-// scaled up to fill the panel, with black bars if the panel isn't the game's 4:3 shape.
+// scaled up to fill the panel, with black bars if the panel isn't the game's 16:9 shape.
 public class MyPanel extends JPanel implements ActionListener {
 
     final Game game;

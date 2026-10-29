@@ -19,8 +19,9 @@ import javax.imageio.ImageIO;
 // Knows nothing about Swing timers or windows.
 public class Game {
 
-    static final int WIDTH = 640;
-    static final int HEIGHT = 480;
+    // the game's own resolution, 16:9; the window scales it up, exactly 2x on a 1920 x 1080 screen
+    static final int WIDTH = 960;
+    static final int HEIGHT = 540;
 
     enum Screen { TITLE, PLAYING, PAUSED, GAME_OVER, CONTROLS, SETTINGS }
 
@@ -66,22 +67,22 @@ public class Game {
         playerHeight = idle.getHeight();
 
         menus = Map.of(
-            Screen.TITLE, new Menu(230, List.of(
+            Screen.TITLE, new Menu(260, List.of(
                 new Menu.Item("Play", this::startNewGame),
                 new Menu.Item("Controls", () -> openFrom(Screen.CONTROLS)),
                 new Menu.Item("Settings", () -> openFrom(Screen.SETTINGS)),
                 new Menu.Item("Quit", () -> System.exit(0)))),
-            Screen.PAUSED, new Menu(230, List.of(
+            Screen.PAUSED, new Menu(260, List.of(
                 new Menu.Item("Resume", () -> show(Screen.PLAYING)),
                 new Menu.Item("Controls", () -> openFrom(Screen.CONTROLS)),
                 new Menu.Item("Settings", () -> openFrom(Screen.SETTINGS)),
                 new Menu.Item("Quit to title", () -> show(Screen.TITLE)))),
-            Screen.GAME_OVER, new Menu(230, List.of(
+            Screen.GAME_OVER, new Menu(260, List.of(
                 new Menu.Item("Play again", this::startNewGame),
                 new Menu.Item("Title screen", () -> show(Screen.TITLE)))),
-            Screen.CONTROLS, new Menu(390, List.of(
+            Screen.CONTROLS, new Menu(420, List.of(
                 new Menu.Item("Back", () -> goBack()))),
-            Screen.SETTINGS, new Menu(150, 380, List.of(
+            Screen.SETTINGS, new Menu(180, 380, List.of(
                 Menu.Item.setting(() -> "Fullscreen: " + (settings.fullscreen ? "On" : "Off"), dir -> {
                     settings.fullscreen = !settings.fullscreen;
                     settings.save();
@@ -185,7 +186,8 @@ public class Game {
     }
 
     void draw(Graphics2D g) {
-        g.drawImage(background, 0, 0, null);
+        // stretched to fill the screen, since the test image is still 640 x 480
+        g.drawImage(background, 0, 0, WIDTH, HEIGHT, null);
         if (inGame()) {
             entities.sort(Comparator.comparingDouble(Entity::depth));
             for (Entity entity : entities) {
@@ -197,25 +199,25 @@ public class Game {
         switch (screen) {
             case TITLE -> {
                 shade(g, new Color(0, 0, 0, 160));
-                centredText(g, "PROJECT Z-D", TITLE_FONT, 190);
+                centredText(g, "PROJECT Z-D", TITLE_FONT, 220);
             }
             case PLAYING -> { }
             case PAUSED -> {
                 shade(g, new Color(0, 0, 0, 140));
-                centredText(g, "PAUSED", HEADING_FONT, 190);
+                centredText(g, "PAUSED", HEADING_FONT, 220);
             }
             case GAME_OVER -> {
                 shade(g, new Color(90, 0, 0, 170));
-                centredText(g, "YOU DIED", HEADING_FONT, 190);
+                centredText(g, "YOU DIED", HEADING_FONT, 220);
             }
             case CONTROLS -> {
                 shade(g, new Color(0, 0, 0, 170));
-                centredText(g, "CONTROLS", HEADING_FONT, 90);
+                centredText(g, "CONTROLS", HEADING_FONT, 120);
                 drawControls(g);
             }
             case SETTINGS -> {
                 shade(g, new Color(0, 0, 0, 170));
-                centredText(g, "SETTINGS", HEADING_FONT, 90);
+                centredText(g, "SETTINGS", HEADING_FONT, 120);
             }
         }
         Menu menu = menus.get(screen);
@@ -226,7 +228,7 @@ public class Game {
     private static void drawControls(Graphics2D g) {
         int middle = WIDTH / 2 - 70;
         for (int i = 0; i < CONTROLS.length; i++) {
-            int y = 150 + i * 40;
+            int y = 180 + i * 40;
             g.setFont(TEXT_BOLD_FONT);
             FontMetrics metrics = g.getFontMetrics();
             shadowText(g, CONTROLS[i][0], middle - metrics.stringWidth(CONTROLS[i][0]), y, Color.WHITE);

@@ -43,7 +43,7 @@ public class MyFrame extends JFrame{
         panel.requestFocusInWindow();
     }
 
-    // 640 x 480 times the scale, shrunk (keeping the shape) if that won't fit on the screen
+    // the game's resolution times the scale, shrunk (keeping the shape) if that won't fit on the screen
     private Dimension windowSize(int scale) {
         Rectangle usable = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
         int roomForBorder = 60; // title bar and edges, which pack adds outside the panel
