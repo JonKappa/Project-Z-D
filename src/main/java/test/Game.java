@@ -22,10 +22,21 @@ public class Game {
     static final int WIDTH = 640;
     static final int HEIGHT = 480;
 
-    enum Screen { TITLE, PLAYING, PAUSED, GAME_OVER }
+    enum Screen { TITLE, PLAYING, PAUSED, GAME_OVER, CONTROLS }
+
+    // each row of the Controls screen: what it does, then the keys
+    private static final String[][] CONTROLS = {
+        {"Move", "W A S D or arrow keys"},
+        {"Run", "Hold Shift"},
+        {"Dodge roll", "Space"},
+        {"Pause", "Esc"},
+        {"Menus", "Arrows or W/S, Enter, or the mouse"},
+    };
 
     private static final Font TITLE_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 48);
     private static final Font HEADING_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 36);
+    private static final Font TEXT_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, 18);
+    private static final Font TEXT_BOLD_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 18);
 
     final Sprite sprites;
     final BufferedImage background;
@@ -36,6 +47,7 @@ public class Game {
     Player player;
     Screen screen = Screen.TITLE;
     private final Map<Screen, Menu> menus;
+    private Screen backTo = Screen.TITLE; // where Back goes from Controls (the title or pause menu)
 
     Game() {
         sprites = new Sprite();
@@ -54,13 +66,35 @@ public class Game {
         menus = Map.of(
             Screen.TITLE, new Menu(230, List.of(
                 new Menu.Item("Play", this::startNewGame),
+                new Menu.Item("Controls", () -> openFrom(Screen.CONTROLS)),
                 new Menu.Item("Quit", () -> System.exit(0)))),
             Screen.PAUSED, new Menu(230, List.of(
                 new Menu.Item("Resume", () -> show(Screen.PLAYING)),
+                new Menu.Item("Controls", () -> openFrom(Screen.CONTROLS)),
                 new Menu.Item("Quit to title", () -> show(Screen.TITLE)))),
             Screen.GAME_OVER, new Menu(230, List.of(
                 new Menu.Item("Play again", this::startNewGame),
-                new Menu.Item("Title screen", () -> show(Screen.TITLE)))));
+                new Menu.Item("Title screen", () -> show(Screen.TITLE)))),
+            Screen.CONTROLS, new Menu(390, List.of(
+                new Menu.Item("Back", () -> goBack()))));
+    }
+
+    // opens a screen reached from the title or pause menu, remembering which one to go back to
+    private void openFrom(Screen next) {
+        backTo = screen;
+        show(next);
+    }
+
+    // back to the menu Controls was opened from, with the same button still highlighted
+    private void goBack() {
+        screen = backTo;
+    }
+
+    // true while a game is under way, including its pause menu and the screens opened from it,
+    // so the world is drawn behind them
+    private boolean inGame() {
+        return screen == Screen.PLAYING || screen == Screen.PAUSED || screen == Screen.GAME_OVER
+                || (screen == Screen.CONTROLS && backTo == Screen.PAUSED);
     }
 
     // switches screen, and opens its menu (if it has one) with the first button highlighted
@@ -101,6 +135,10 @@ public class Game {
                 if (input.wasPressed(KeyEvent.VK_ESCAPE)) show(Screen.PLAYING);
                 else menus.get(screen).update(input);
             }
+            case CONTROLS -> {
+                if (input.wasPressed(KeyEvent.VK_ESCAPE)) goBack();
+                else menus.get(screen).update(input);
+            }
             case TITLE, GAME_OVER -> menus.get(screen).update(input);
         }
     }
@@ -127,7 +165,7 @@ public class Game {
 
     void draw(Graphics2D g) {
         g.drawImage(background, 0, 0, null);
-        if (screen != Screen.TITLE) {
+        if (inGame()) {
             entities.sort(Comparator.comparingDouble(Entity::depth));
             for (Entity entity : entities) {
                 entity.draw(g, this);
@@ -149,9 +187,27 @@ public class Game {
                 shade(g, new Color(90, 0, 0, 170));
                 centredText(g, "YOU DIED", HEADING_FONT, 190);
             }
+            case CONTROLS -> {
+                shade(g, new Color(0, 0, 0, 170));
+                centredText(g, "CONTROLS", HEADING_FONT, 90);
+                drawControls(g);
+            }
         }
         Menu menu = menus.get(screen);
         if (menu != null) menu.draw(g);
+    }
+
+    // the action names right-aligned to the middle of the screen, the keys left-aligned after them
+    private static void drawControls(Graphics2D g) {
+        int middle = WIDTH / 2 - 70;
+        for (int i = 0; i < CONTROLS.length; i++) {
+            int y = 150 + i * 40;
+            g.setFont(TEXT_BOLD_FONT);
+            FontMetrics metrics = g.getFontMetrics();
+            shadowText(g, CONTROLS[i][0], middle - metrics.stringWidth(CONTROLS[i][0]), y, Color.WHITE);
+            g.setFont(TEXT_FONT);
+            shadowText(g, CONTROLS[i][1], middle + 20, y, new Color(220, 220, 220));
+        }
     }
 
     private static void shade(Graphics2D g, Color color) {
@@ -163,10 +219,13 @@ public class Game {
     private static void centredText(Graphics2D g, String text, Font font, int y) {
         g.setFont(font);
         FontMetrics metrics = g.getFontMetrics();
-        int x = (WIDTH - metrics.stringWidth(text)) / 2;
+        shadowText(g, text, (WIDTH - metrics.stringWidth(text)) / 2, y, Color.WHITE);
+    }
+
+    private static void shadowText(Graphics2D g, String text, int x, int y, Color color) {
         g.setColor(Color.BLACK);
         g.drawString(text, x + 2, y + 2);
-        g.setColor(Color.WHITE);
+        g.setColor(color);
         g.drawString(text, x, y);
     }
 
