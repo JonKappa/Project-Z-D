@@ -50,6 +50,11 @@ public class Menu {
             this(() -> label, onSelect, null, null, null);
         }
 
+        // a setting that Enter, a click, Left or Right change; label shows its current value
+        static Item setting(Supplier<String> label, IntConsumer onAdjust) {
+            return new Item(label, () -> onAdjust.accept(1), onAdjust, null, null);
+        }
+
         // a 0 to 100 slider; Left/Right move it by step, and the mouse can click or drag it
         static Item slider(String label, IntSupplier value, IntConsumer set, int step) {
             return new Item(() -> label, null,

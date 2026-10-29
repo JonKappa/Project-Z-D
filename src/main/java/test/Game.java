@@ -47,6 +47,7 @@ public class Game {
     private final int playerHeight;
     Player player;
     Screen screen = Screen.TITLE;
+    Runnable onDisplayChange = () -> { }; // the window sets this to re-apply fullscreen and window size
     private final Map<Screen, Menu> menus;
     private Screen backTo = Screen.TITLE; // where Back goes from Controls or Settings (the title or pause menu)
 
@@ -82,6 +83,18 @@ public class Game {
             Screen.CONTROLS, new Menu(390, List.of(
                 new Menu.Item("Back", () -> goBack()))),
             Screen.SETTINGS, new Menu(150, 380, List.of(
+                Menu.Item.setting(() -> "Fullscreen: " + (settings.fullscreen ? "On" : "Off"), dir -> {
+                    settings.fullscreen = !settings.fullscreen;
+                    settings.save();
+                    onDisplayChange.run();
+                }),
+                Menu.Item.setting(() -> "Window size: " + settings.windowScale + "x", dir -> {
+                    // wraps round: Right or Enter on 3x goes back to 1x
+                    int count = Settings.MAX_WINDOW_SCALE;
+                    settings.windowScale = (settings.windowScale - 1 + dir + count) % count + 1;
+                    settings.save();
+                    onDisplayChange.run();
+                }),
                 Menu.Item.slider("Music volume", () -> settings.musicVolume,
                         v -> { settings.musicVolume = v; settings.save(); }, Settings.VOLUME_STEP),
                 Menu.Item.slider("Effects volume", () -> settings.effectsVolume,

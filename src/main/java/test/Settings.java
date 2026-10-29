@@ -13,6 +13,10 @@ public class Settings {
 
     static final Path FILE = Path.of(System.getProperty("user.home"), ".project-z-d", "settings.properties");
     static final int VOLUME_STEP = 10;
+    static final int MAX_WINDOW_SCALE = 3;
+
+    boolean fullscreen = false;
+    int windowScale = 1; // the window is 640 x 480 times this, shrunk if the screen is too small
 
     // 0 to 100; nothing plays sound yet, these are ready for when it does
     int musicVolume = 80;
@@ -31,6 +35,8 @@ public class Settings {
             System.err.println("Couldn't read " + FILE + ", using default settings: " + e.getMessage());
             return settings;
         }
+        settings.fullscreen = Boolean.parseBoolean(props.getProperty("fullscreen", "false").trim());
+        settings.windowScale = readInt(props, "windowScale", settings.windowScale, 1, MAX_WINDOW_SCALE);
         settings.musicVolume = readInt(props, "musicVolume", settings.musicVolume, 0, 100);
         settings.effectsVolume = readInt(props, "effectsVolume", settings.effectsVolume, 0, 100);
         return settings;
@@ -38,6 +44,8 @@ public class Settings {
 
     void save() {
         Properties props = new Properties();
+        props.setProperty("fullscreen", Boolean.toString(fullscreen));
+        props.setProperty("windowScale", Integer.toString(windowScale));
         props.setProperty("musicVolume", Integer.toString(musicVolume));
         props.setProperty("effectsVolume", Integer.toString(effectsVolume));
         try {
