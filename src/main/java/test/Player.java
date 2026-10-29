@@ -67,6 +67,12 @@ public class Player extends Entity {
         this.frameCounts = frameCounts;
     }
 
+    // sorted by the feet, so the player goes behind a wall or sprite that stands in front of where they stand
+    @Override
+    double depth() {
+        return y + FEET_Y;
+    }
+
     // dirX and dirY are -1, 0 or 1
     void control(int dirX, int dirY, boolean dodgePressed) {
         this.dirX = dirX;

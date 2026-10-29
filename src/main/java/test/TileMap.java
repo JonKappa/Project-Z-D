@@ -8,21 +8,35 @@ import java.nio.file.Path;
 import java.util.List;
 
 // The level as a grid of square tiles, loaded from a text file with one character per tile.
+// Walls are drawn in a 3/4 view: each solid tile stands WALL_HEIGHT tall, showing its front face
+// in its own tile and its top one tile further up the screen.
 public class TileMap {
 
-    static final int TILE = 32; // pixels per tile side
+    static final int TILE = 32;        // pixels per tile side
+    static final int WALL_HEIGHT = 32; // how far above its base a wall's top is drawn
+    // how far feet can go behind a front wall's top, so standing behind the south wall hides
+    // the boots but not half the body
+    static final int FEET_BEHIND_WALL = 12;
+
+    // placeholder colours until there's tile art
+    private static final Color WALL_TOP = new Color(58, 54, 64);
+    private static final Color WALL_TOP_EDGE = new Color(84, 80, 90); // where a wall's top meets its face
+    private static final Color WALL_FACE = new Color(98, 92, 104);
+    private static final Color WALL_FOOT = new Color(64, 60, 70);     // shadow where a face meets the ground
+    private static final Color DOOR_KNOB = new Color(200, 170, 80);
 
     enum Tile {
         GROUND(',', false, new Color(74, 92, 58)),     // the yard outside
         FLOOR('.', false, new Color(120, 98, 74)),     // inside the building
-        WALL('#', true, new Color(88, 84, 92)),
-        WINDOW('W', true, new Color(110, 150, 170)),
-        FRONT_DOOR('D', true, new Color(118, 72, 40)),
+        WALL('#', true, null),
+        WINDOW('W', true, new Color(126, 170, 192)),   // glass
+        FRONT_DOOR('D', true, new Color(118, 72, 40)), // wood
         BACK_DOOR('B', true, new Color(92, 56, 32));
 
         final char symbol;
         final boolean solid; // blocks the player
-        final Color colour;  // placeholder colour until there's tile art
+        // the ground colour for floor tiles; for walls, the glass or wood set into them (null for plain wall)
+        final Color colour;
 
         Tile(char symbol, boolean solid, Color colour) {
             this.symbol = symbol;
@@ -97,7 +111,8 @@ public class TileMap {
         return tiles[row][col];
     }
 
-    // true if any solid tile overlaps the box from (left, top) up to, but not including, (right, bottom)
+    // true if the box from (left, top) up to, but not including, (right, bottom) overlaps a solid tile,
+    // or reaches further behind a front wall than FEET_BEHIND_WALL
     boolean blocked(double left, double top, double right, double bottom) {
         int firstCol = (int) Math.floor(left / TILE);
         int lastCol = (int) Math.floor((right - 0.001) / TILE);
@@ -106,6 +121,15 @@ public class TileMap {
         for (int row = firstRow; row <= lastRow; row++) {
             for (int col = firstCol; col <= lastCol; col++) {
                 if (at(col, row).solid) return true;
+            }
+        }
+        // a front wall's top is drawn over the tile above it; all but the top FEET_BEHIND_WALL pixels
+        // of that strip are off limits
+        int reach = WALL_HEIGHT - FEET_BEHIND_WALL;
+        int lastWall = (int) Math.floor((bottom - 0.001 + reach) / TILE);
+        for (int row = firstRow; row <= lastWall; row++) {
+            for (int col = firstCol; col <= lastCol; col++) {
+                if (isFrontWall(col, row) && bottom > row * TILE - reach && top < row * TILE) return true;
             }
         }
         return false;
@@ -119,17 +143,105 @@ public class TileMap {
         return rows * TILE;
     }
 
-    // draws the tiles that are on screen; viewX and viewY are the world position of the screen's top-left corner
-    void draw(Graphics2D g, double viewX, double viewY) {
-        int firstCol = Math.max(0, (int) Math.floor(viewX / TILE));
-        int firstRow = Math.max(0, (int) Math.floor(viewY / TILE));
-        int lastCol = Math.min(cols - 1, (int) Math.floor((viewX + Game.WIDTH) / TILE));
-        int lastRow = Math.min(rows - 1, (int) Math.floor((viewY + Game.HEIGHT) / TILE));
-        for (int row = firstRow; row <= lastRow; row++) {
-            for (int col = firstCol; col <= lastCol; col++) {
-                g.setColor(tiles[row][col].colour);
-                g.fillRect(col * TILE, row * TILE, TILE, TILE);
+    // The drawing below takes viewX and viewY, the world position of the screen's top-left corner,
+    // and only draws what's on screen. Game draws in this order: the ground, the back walls, then
+    // the sprites and each row of front walls interleaved from the top of the screen down.
+
+    // the floor and the yard
+    void drawGround(Graphics2D g, double viewX, double viewY) {
+        for (int row = firstRow(viewY); row <= Math.min(rows - 1, lastGroundRow(viewY)); row++) {
+            for (int col = firstCol(viewX); col <= lastCol(viewX); col++) {
+                Tile tile = tiles[row][col];
+                if (!tile.solid) {
+                    g.setColor(tile.colour);
+                    g.fillRect(col * TILE, row * TILE, TILE, TILE);
+                }
             }
+        }
+    }
+
+    // A front wall has nothing solid below it, so its face shows and it can hide whatever stands just
+    // behind it, the way the south wall hides the player's legs. The rest are back walls, in the middle
+    // of a north-south run: the wall below covers their face, so they never need to hide a sprite.
+    boolean isFrontWall(int col, int row) {
+        return at(col, row).solid && !at(col, row + 1).solid;
+    }
+
+    // the back walls, drawn before any sprites
+    void drawBackWalls(Graphics2D g, double viewX, double viewY) {
+        for (int row = firstRow(viewY); row <= lastWallRow(viewY); row++) {
+            for (int col = firstCol(viewX); col <= lastCol(viewX); col++) {
+                if (tiles[row][col].solid && !isFrontWall(col, row)) drawWall(g, col, row);
+            }
+        }
+    }
+
+    // one row of front walls; Game draws the sprites standing behind this row first
+    void drawFrontWalls(Graphics2D g, int row, double viewX) {
+        for (int col = firstCol(viewX); col <= lastCol(viewX); col++) {
+            if (isFrontWall(col, row)) drawWall(g, col, row);
+        }
+    }
+
+    // the rows whose walls can show on screen; a wall's top sits above its base, so this runs a row past the ground
+    int firstRow(double viewY) {
+        return Math.max(0, (int) Math.floor(viewY / TILE));
+    }
+
+    int lastWallRow(double viewY) {
+        return Math.min(rows - 1, (int) Math.floor((viewY + Game.HEIGHT + WALL_HEIGHT) / TILE));
+    }
+
+    private int lastGroundRow(double viewY) {
+        return (int) Math.floor((viewY + Game.HEIGHT) / TILE);
+    }
+
+    private int firstCol(double viewX) {
+        return Math.max(0, (int) Math.floor(viewX / TILE));
+    }
+
+    private int lastCol(double viewX) {
+        return Math.min(cols - 1, (int) Math.floor((viewX + Game.WIDTH) / TILE));
+    }
+
+    // one wall tile: its face in its own tile and its top above that, with glass or wood set in
+    private void drawWall(Graphics2D g, int col, int row) {
+        Tile tile = tiles[row][col];
+        int x = col * TILE;
+        int faceY = (row + 1) * TILE - WALL_HEIGHT;
+        int topY = row * TILE - WALL_HEIGHT;
+
+        g.setColor(WALL_FACE);
+        g.fillRect(x, faceY, TILE, WALL_HEIGHT);
+        g.setColor(WALL_FOOT);
+        g.fillRect(x, faceY + WALL_HEIGHT - 3, TILE, 3);
+        if (tile == Tile.WINDOW) {
+            g.setColor(tile.colour);
+            g.fillRect(x + 5, faceY + 6, TILE - 10, WALL_HEIGHT - 14);
+        } else if (tile == Tile.FRONT_DOOR || tile == Tile.BACK_DOOR) {
+            // doors are two tiles wide; each tile is one leaf, with its knob by the middle of the doorway
+            g.setColor(tile.colour);
+            g.fillRect(x + 2, faceY + 3, TILE - 4, WALL_HEIGHT - 3);
+            boolean leftLeaf = at(col + 1, row) == tile;
+            g.setColor(DOOR_KNOB);
+            g.fillRect(leftLeaf ? x + TILE - 8 : x + 5, faceY + WALL_HEIGHT / 2, 3, 3);
+        }
+
+        g.setColor(WALL_TOP);
+        g.fillRect(x, topY, TILE, TILE);
+        if (tile.colour != null) {
+            // the window glass or door seen from above: a strip along the wall
+            g.setColor(tile.colour);
+            boolean northSouthRun = at(col, row - 1).solid && at(col, row + 1).solid;
+            if (northSouthRun) {
+                g.fillRect(x + TILE / 2 - 3, topY, 6, TILE);
+            } else {
+                g.fillRect(x, topY + TILE / 2 - 3, TILE, 6);
+            }
+        }
+        if (isFrontWall(col, row)) {
+            g.setColor(WALL_TOP_EDGE);
+            g.fillRect(x, topY + TILE - 2, TILE, 2);
         }
     }
 }

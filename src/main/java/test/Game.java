@@ -231,13 +231,26 @@ public class Game {
         // the world is drawn in world coordinates, shifted so the camera's corner is the screen's corner;
         // whole pixels, so tiles and sprites don't shimmer as the camera moves
         Graphics2D world = (Graphics2D) g.create();
-        world.translate(-Math.round(cameraX), -Math.round(cameraY));
-        map.draw(world, Math.round(cameraX), Math.round(cameraY));
-        if (inGame()) {
-            entities.sort(Comparator.comparingDouble(Entity::depth));
-            for (Entity entity : entities) {
-                entity.draw(world, this);
+        long viewX = Math.round(cameraX);
+        long viewY = Math.round(cameraY);
+        world.translate(-viewX, -viewY);
+        map.drawGround(world, viewX, viewY);
+        map.drawBackWalls(world, viewX, viewY);
+
+        // sprites and front walls from the top of the screen down: each row of front walls goes over
+        // the sprites standing behind it (higher up the screen) and under the ones in front of it
+        List<Entity> drawn = inGame() ? entities : List.of();
+        entities.sort(Comparator.comparingDouble(Entity::depth));
+        int next = 0;
+        for (int row = map.firstRow(viewY); row <= map.lastWallRow(viewY); row++) {
+            double wallDepth = (row + 1) * TileMap.TILE; // a wall row stands at the bottom edge of its tiles
+            while (next < drawn.size() && drawn.get(next).depth() < wallDepth) {
+                drawn.get(next++).draw(world, this);
             }
+            map.drawFrontWalls(world, row, viewX);
+        }
+        while (next < drawn.size()) {
+            drawn.get(next++).draw(world, this);
         }
         world.dispose();
 
