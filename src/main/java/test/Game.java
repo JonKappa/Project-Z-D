@@ -27,7 +27,6 @@ public class Game {
     // each row of the Controls screen: what it does, then the keys
     private static final String[][] CONTROLS = {
         {"Move", "W A S D or arrow keys"},
-        {"Run", "Hold Shift"},
         {"Dodge roll", "Space"},
         {"Pause", "Esc"},
         {"Menus", "Arrows or W/S, Enter, or the mouse"},
@@ -174,10 +173,9 @@ public class Game {
         if (input.isDown(KeyEvent.VK_D, KeyEvent.VK_RIGHT)) dirX += 1;
         if (input.isDown(KeyEvent.VK_W, KeyEvent.VK_UP)) dirY -= 1;
         if (input.isDown(KeyEvent.VK_S, KeyEvent.VK_DOWN)) dirY += 1;
-        boolean running = input.isDown(KeyEvent.VK_SHIFT);
         boolean dodge = input.wasPressed(KeyEvent.VK_SPACE);
 
-        player.control(dirX, dirY, running, dodge);
+        player.control(dirX, dirY, dodge);
 
         // a copy, so an entity can spawn others during its update
         for (Entity entity : new ArrayList<>(entities)) {

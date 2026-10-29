@@ -8,7 +8,7 @@ import java.awt.image.BufferedImage;
 public class Player extends Entity {
 
     enum State {
-        IDLE(0, 0.2), WALK(1, 0.1), RUN(2, 0.1), DODGE(3, 0.075);
+        IDLE(0, 0.2), RUN(1, 0.1), DODGE(2, 0.075);
 
         final int animationIndex; // index into Sprite.animation
         final double frameTime;   // seconds each animation frame stays on screen
@@ -32,8 +32,7 @@ public class Player extends Entity {
         }
     }
 
-    static final double WALK_SPEED = 70;      // pixels per second
-    static final double RUN_SPEED = 140;
+    static final double RUN_SPEED = 140;      // pixels per second
     static final double DODGE_SPEED = 200;    // a roll lasts 8 frames x 0.075 s, so it covers about 120 px
     // speed of each dodge frame as a share of DODGE_SPEED: slow while the boots are planted
     // (crouch, land, stand up) so they don't skate, fast while diving and rolling; averages 1
@@ -54,7 +53,6 @@ public class Player extends Entity {
     // this tick's controls, set by Game before update
     private int dirX; // -1, 0 or 1
     private int dirY;
-    private boolean running;
     private boolean dodgePressed;
 
     Player(double x, double y, int width, int height, int[] frameCounts) {
@@ -63,10 +61,9 @@ public class Player extends Entity {
     }
 
     // dirX and dirY are -1, 0 or 1
-    void control(int dirX, int dirY, boolean running, boolean dodgePressed) {
+    void control(int dirX, int dirY, boolean dodgePressed) {
         this.dirX = dirX;
         this.dirY = dirY;
-        this.running = running;
         this.dodgePressed = dodgePressed;
     }
 
@@ -93,24 +90,20 @@ public class Player extends Entity {
         }
 
         boolean moving = dirX != 0 || dirY != 0;
-        State newState = !moving ? State.IDLE : running ? State.RUN : State.WALK;
+        State newState = moving ? State.RUN : State.IDLE;
 
         if (moving) {
-            move(dirX, dirY, running ? RUN_SPEED : WALK_SPEED, dt, maxX, maxY);
+            move(dirX, dirY, RUN_SPEED, dt, maxX, maxY);
         }
         face(dirX, dirY, dt);
 
         if (newState != state) {
-            // walk and run land the same foot on the same frame, so switching between them keeps the step
-            boolean walkRunSwitch = state != State.IDLE && newState != State.IDLE;
             state = newState;
-            if (!walkRunSwitch) {
-                // the left-side facings play their strides half a cycle on (see draw), so a stride
-                // starting there starts half a cycle in, and every facing steps off on the same frame
-                boolean mirroredStride = state != State.IDLE && facing.dirX < 0;
-                frame = mirroredStride ? frameCounts[state.animationIndex] / 2 : 0;
-                frameTimer = 0;
-            }
+            // the left-side facings play their strides half a cycle on (see draw), so a stride
+            // starting there starts half a cycle in, and every facing steps off on the same frame
+            boolean mirroredStride = state == State.RUN && facing.dirX < 0;
+            frame = mirroredStride ? frameCounts[state.animationIndex] / 2 : 0;
+            frameTimer = 0;
         }
         frameTimer += dt;
         while (frameTimer >= state.frameTime) {
@@ -193,7 +186,7 @@ public class Player extends Entity {
         boolean mirrored = facing.dirX < 0;
         BufferedImage[] frames = game.sprites.animation[direction][state.animationIndex];
         int shown = frame;
-        if (mirrored && (state == State.WALK || state == State.RUN)) {
+        if (mirrored && state == State.RUN) {
             // mirroring swaps which foot is in front, so a mirrored stride is shifted by half a cycle;
             // that keeps the same foot forward when turning between down and down-left, or up and up-left
             shown = (shown + frames.length / 2) % frames.length;
