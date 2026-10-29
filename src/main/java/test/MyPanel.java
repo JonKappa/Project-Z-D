@@ -3,6 +3,8 @@ package test;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import javax.swing.*;
 
 // The window's drawing surface. Runs the game loop on a Swing timer and draws whatever Game holds.
@@ -17,10 +19,38 @@ public class MyPanel extends JPanel implements ActionListener {
         this.setPreferredSize(new Dimension(Game.WIDTH, Game.HEIGHT));
         game = new Game();
         input = new Input();
+        listenToMouse();
 
         lastTickTime = System.nanoTime();
         timer = new Timer(16, this); // about 60 updates a second
         timer.start();
+    }
+
+    // passes the mouse to Input; the panel is drawn at the game's own size, so its pixels are game pixels
+    private void listenToMouse() {
+        MouseAdapter mouse = new MouseAdapter() {
+            @Override
+            public void mouseMoved(MouseEvent e) {
+                input.mouseMoved(e.getX(), e.getY());
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                input.mouseMoved(e.getX(), e.getY());
+            }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (e.getButton() == MouseEvent.BUTTON1) input.mousePressed(e.getX(), e.getY());
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (e.getButton() == MouseEvent.BUTTON1) input.mouseReleased();
+            }
+        };
+        addMouseListener(mouse);
+        addMouseMotionListener(mouse);
     }
 
     // the window calls this once it exists, so keys held while it loses focus don't stay stuck down,

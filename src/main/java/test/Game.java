@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import javax.imageio.ImageIO;
 
 // The game world: everything in it, which screen is showing, and one update step.
@@ -25,7 +26,6 @@ public class Game {
 
     private static final Font TITLE_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 48);
     private static final Font HEADING_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 36);
-    private static final Font HINT_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, 18);
 
     final Sprite sprites;
     final BufferedImage background;
@@ -35,6 +35,7 @@ public class Game {
     private final int playerHeight;
     Player player;
     Screen screen = Screen.TITLE;
+    private final Map<Screen, Menu> menus;
 
     Game() {
         sprites = new Sprite();
@@ -49,6 +50,24 @@ public class Game {
         BufferedImage idle = down[Player.State.IDLE.animationIndex][0];
         playerWidth = idle.getWidth();
         playerHeight = idle.getHeight();
+
+        menus = Map.of(
+            Screen.TITLE, new Menu(230, List.of(
+                new Menu.Item("Play", this::startNewGame),
+                new Menu.Item("Quit", () -> System.exit(0)))),
+            Screen.PAUSED, new Menu(230, List.of(
+                new Menu.Item("Resume", () -> show(Screen.PLAYING)),
+                new Menu.Item("Quit to title", () -> show(Screen.TITLE)))),
+            Screen.GAME_OVER, new Menu(230, List.of(
+                new Menu.Item("Play again", this::startNewGame),
+                new Menu.Item("Title screen", () -> show(Screen.TITLE)))));
+    }
+
+    // switches screen, and opens its menu (if it has one) with the first button highlighted
+    void show(Screen next) {
+        screen = next;
+        Menu menu = menus.get(next);
+        if (menu != null) menu.reset();
     }
 
     // clears the world and puts a fresh player in the middle of the screen
@@ -57,37 +76,32 @@ public class Game {
         player = new Player((WIDTH - playerWidth) / 2.0, (HEIGHT - playerHeight) / 2.0,
                 playerWidth, playerHeight, playerFrameCounts);
         entities.add(player);
-        screen = Screen.PLAYING;
+        show(Screen.PLAYING);
     }
 
     // pauses a game in progress; does nothing on the other screens
     void pause() {
-        if (screen == Screen.PLAYING) screen = Screen.PAUSED;
+        if (screen == Screen.PLAYING) show(Screen.PAUSED);
     }
 
     // one step of the game; dt is seconds since the last step
     void update(double dt, Input input) {
         switch (screen) {
-            case TITLE -> {
-                // Esc does nothing here, so tapping it twice on game over can't close the whole game
-                if (input.wasPressed(KeyEvent.VK_ENTER)) startNewGame();
-            }
             case PLAYING -> {
                 if (input.wasPressed(KeyEvent.VK_ESCAPE)) {
-                    screen = Screen.PAUSED;
+                    show(Screen.PAUSED);
                     return;
                 }
                 updateWorld(dt, input);
-                if (player.isDead()) screen = Screen.GAME_OVER;
+                if (player.isDead()) show(Screen.GAME_OVER);
             }
             case PAUSED -> {
-                if (input.wasPressed(KeyEvent.VK_ESCAPE)) screen = Screen.PLAYING;
-                else if (input.wasPressed(KeyEvent.VK_Q)) screen = Screen.TITLE;
+                // Esc goes back to the game; it does nothing on the title or game over screens,
+                // so a double tap can't skip past a menu
+                if (input.wasPressed(KeyEvent.VK_ESCAPE)) show(Screen.PLAYING);
+                else menus.get(screen).update(input);
             }
-            case GAME_OVER -> {
-                if (input.wasPressed(KeyEvent.VK_ENTER)) startNewGame();
-                else if (input.wasPressed(KeyEvent.VK_ESCAPE)) screen = Screen.TITLE;
-            }
+            case TITLE, GAME_OVER -> menus.get(screen).update(input);
         }
     }
 
@@ -125,22 +139,19 @@ public class Game {
             case TITLE -> {
                 shade(g, new Color(0, 0, 0, 160));
                 centredText(g, "PROJECT Z-D", TITLE_FONT, 190);
-                centredText(g, "Enter to play", HINT_FONT, 260);
             }
             case PLAYING -> { }
             case PAUSED -> {
                 shade(g, new Color(0, 0, 0, 140));
-                centredText(g, "PAUSED", HEADING_FONT, 200);
-                centredText(g, "Esc to resume", HINT_FONT, 250);
-                centredText(g, "Q to quit to the title screen", HINT_FONT, 280);
+                centredText(g, "PAUSED", HEADING_FONT, 190);
             }
             case GAME_OVER -> {
                 shade(g, new Color(90, 0, 0, 170));
-                centredText(g, "YOU DIED", HEADING_FONT, 200);
-                centredText(g, "Enter to play again", HINT_FONT, 250);
-                centredText(g, "Esc for the title screen", HINT_FONT, 280);
+                centredText(g, "YOU DIED", HEADING_FONT, 190);
             }
         }
+        Menu menu = menus.get(screen);
+        if (menu != null) menu.draw(g);
     }
 
     private static void shade(Graphics2D g, Color color) {
