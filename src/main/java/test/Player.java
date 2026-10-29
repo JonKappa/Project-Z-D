@@ -227,8 +227,9 @@ public class Player extends Entity {
             shown = (shown + frames.length / 2) % frames.length;
         }
         BufferedImage img = frames[shown];
-        int drawX = (int) x;
-        int drawY = (int) y;
+        // the nearest whole pixel, the same one the camera follows
+        int drawX = (int) Math.round(x);
+        int drawY = (int) Math.round(y);
         if (mirrored) {
             g.drawImage(img, drawX + 2 * Sprite.CENTER_X, drawY, -img.getWidth(), img.getHeight(), null);
         }

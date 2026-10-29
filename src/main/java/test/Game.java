@@ -184,10 +184,11 @@ public class Game {
     }
 
     // the camera's left (or top) edge to centre on a point without showing past the edge of the map;
-    // in a view bigger than the map, the map sits in the middle
+    // in a view bigger than the map, the map sits in the middle. Always a whole pixel, so the world
+    // and the sprites in it shift together.
     private static double cameraEdge(double centre, int view, int mapSize) {
-        if (view >= mapSize) return (mapSize - view) / 2.0;
-        return Math.max(0, Math.min(centre - view / 2.0, mapSize - view));
+        if (view >= mapSize) return Math.floor((mapSize - view) / 2.0);
+        return Math.floor(Math.max(0, Math.min(centre - view / 2.0, mapSize - view)));
     }
 
     // pauses a game in progress; does nothing on the other screens
@@ -238,8 +239,10 @@ public class Game {
         }
         entities.removeIf(entity -> entity.removed);
 
-        // follows the player's middle rather than their feet, so they sit in the centre of the screen
-        lookAt(player.x + Player.FEET_X, player.y + playerHeight / 2.0);
+        // follows the player's middle rather than their feet, so they sit in the centre of the screen.
+        // It follows the whole pixel the player is drawn at, so the two move together and the player
+        // doesn't shake by a pixel against the background.
+        lookAt(Math.round(player.x) + Player.FEET_X, Math.round(player.y) + playerHeight / 2.0);
     }
 
     void draw(Graphics2D g) {
