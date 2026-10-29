@@ -22,7 +22,7 @@ public class Game {
     static final int WIDTH = 640;
     static final int HEIGHT = 480;
 
-    enum Screen { TITLE, PLAYING, PAUSED, GAME_OVER, CONTROLS }
+    enum Screen { TITLE, PLAYING, PAUSED, GAME_OVER, CONTROLS, SETTINGS }
 
     // each row of the Controls screen: what it does, then the keys
     private static final String[][] CONTROLS = {
@@ -38,6 +38,7 @@ public class Game {
     private static final Font TEXT_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, 18);
     private static final Font TEXT_BOLD_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 18);
 
+    final Settings settings;
     final Sprite sprites;
     final BufferedImage background;
     final List<Entity> entities = new ArrayList<>();
@@ -47,9 +48,10 @@ public class Game {
     Player player;
     Screen screen = Screen.TITLE;
     private final Map<Screen, Menu> menus;
-    private Screen backTo = Screen.TITLE; // where Back goes from Controls (the title or pause menu)
+    private Screen backTo = Screen.TITLE; // where Back goes from Controls or Settings (the title or pause menu)
 
     Game() {
+        settings = Settings.load();
         sprites = new Sprite();
         background = loadImage("./Sprites/Background/testBackground.png");
 
@@ -67,15 +69,23 @@ public class Game {
             Screen.TITLE, new Menu(230, List.of(
                 new Menu.Item("Play", this::startNewGame),
                 new Menu.Item("Controls", () -> openFrom(Screen.CONTROLS)),
+                new Menu.Item("Settings", () -> openFrom(Screen.SETTINGS)),
                 new Menu.Item("Quit", () -> System.exit(0)))),
             Screen.PAUSED, new Menu(230, List.of(
                 new Menu.Item("Resume", () -> show(Screen.PLAYING)),
                 new Menu.Item("Controls", () -> openFrom(Screen.CONTROLS)),
+                new Menu.Item("Settings", () -> openFrom(Screen.SETTINGS)),
                 new Menu.Item("Quit to title", () -> show(Screen.TITLE)))),
             Screen.GAME_OVER, new Menu(230, List.of(
                 new Menu.Item("Play again", this::startNewGame),
                 new Menu.Item("Title screen", () -> show(Screen.TITLE)))),
             Screen.CONTROLS, new Menu(390, List.of(
+                new Menu.Item("Back", () -> goBack()))),
+            Screen.SETTINGS, new Menu(150, 380, List.of(
+                Menu.Item.slider("Music volume", () -> settings.musicVolume,
+                        v -> { settings.musicVolume = v; settings.save(); }, Settings.VOLUME_STEP),
+                Menu.Item.slider("Effects volume", () -> settings.effectsVolume,
+                        v -> { settings.effectsVolume = v; settings.save(); }, Settings.VOLUME_STEP),
                 new Menu.Item("Back", () -> goBack()))));
     }
 
@@ -85,7 +95,7 @@ public class Game {
         show(next);
     }
 
-    // back to the menu Controls was opened from, with the same button still highlighted
+    // back to the menu Controls or Settings was opened from, with the same button still highlighted
     private void goBack() {
         screen = backTo;
     }
@@ -94,7 +104,7 @@ public class Game {
     // so the world is drawn behind them
     private boolean inGame() {
         return screen == Screen.PLAYING || screen == Screen.PAUSED || screen == Screen.GAME_OVER
-                || (screen == Screen.CONTROLS && backTo == Screen.PAUSED);
+                || ((screen == Screen.CONTROLS || screen == Screen.SETTINGS) && backTo == Screen.PAUSED);
     }
 
     // switches screen, and opens its menu (if it has one) with the first button highlighted
@@ -135,7 +145,7 @@ public class Game {
                 if (input.wasPressed(KeyEvent.VK_ESCAPE)) show(Screen.PLAYING);
                 else menus.get(screen).update(input);
             }
-            case CONTROLS -> {
+            case CONTROLS, SETTINGS -> {
                 if (input.wasPressed(KeyEvent.VK_ESCAPE)) goBack();
                 else menus.get(screen).update(input);
             }
@@ -191,6 +201,10 @@ public class Game {
                 shade(g, new Color(0, 0, 0, 170));
                 centredText(g, "CONTROLS", HEADING_FONT, 90);
                 drawControls(g);
+            }
+            case SETTINGS -> {
+                shade(g, new Color(0, 0, 0, 170));
+                centredText(g, "SETTINGS", HEADING_FONT, 90);
             }
         }
         Menu menu = menus.get(screen);
