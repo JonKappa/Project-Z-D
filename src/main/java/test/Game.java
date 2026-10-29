@@ -7,13 +7,10 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import javax.imageio.ImageIO;
 
 // The game world: everything in it, which screen is showing, and one update step.
 // Knows nothing about Swing timers or windows.
@@ -41,7 +38,9 @@ public class Game {
 
     final Settings settings;
     final Sprite sprites;
-    final BufferedImage background;
+    final TileMap map;
+    double cameraX; // world position of the screen's top-left corner
+    double cameraY;
     final List<Entity> entities = new ArrayList<>();
     private final int[] playerFrameCounts;
     private final int playerWidth;
@@ -59,7 +58,7 @@ public class Game {
     Game() {
         settings = Settings.load();
         sprites = new Sprite();
-        background = loadImage("./Sprites/Background/testBackground.png");
+        map = TileMap.load("./Maps/start.txt");
 
         // every direction has the same number of frames per animation
         BufferedImage[][] down = sprites.animation[Sprite.DOWN];
@@ -70,6 +69,7 @@ public class Game {
         BufferedImage idle = down[Player.State.IDLE.animationIndex][0];
         playerWidth = idle.getWidth();
         playerHeight = idle.getHeight();
+        lookAt(spawnX(), spawnY()); // the title screen shows the room behind its menu
 
         menus = Map.of(
             Screen.TITLE, new Menu(260, List.of(
@@ -150,13 +150,29 @@ public class Game {
         if (menu != null) menu.reset();
     }
 
-    // clears the world and puts a fresh player in the middle of the screen
+    // clears the world and puts a fresh player on the map's start tile
     void startNewGame() {
         entities.clear();
-        player = new Player((viewWidth - playerWidth) / 2.0, (viewHeight - playerHeight) / 2.0,
+        player = new Player(spawnX() - Player.FEET_X, spawnY() - Player.FEET_Y,
                 playerWidth, playerHeight, playerFrameCounts);
         entities.add(player);
+        lookAt(player.x + Player.FEET_X, player.y + Player.FEET_Y);
         show(Screen.PLAYING);
+    }
+
+    // the middle of the bottom edge of the start tile, where the player's feet go
+    private double spawnX() {
+        return (map.spawnCol + 0.5) * TileMap.TILE;
+    }
+
+    private double spawnY() {
+        return (map.spawnRow + 1) * TileMap.TILE - 1;
+    }
+
+    // centres the camera on a world position, without showing past the edge of the map
+    private void lookAt(double worldX, double worldY) {
+        cameraX = Math.max(0, Math.min(worldX - WIDTH / 2.0, map.pixelWidth() - WIDTH));
+        cameraY = Math.max(0, Math.min(worldY - HEIGHT / 2.0, map.pixelHeight() - HEIGHT));
     }
 
     // pauses a game in progress; does nothing on the other screens
@@ -206,16 +222,24 @@ public class Game {
             entity.update(dt, this);
         }
         entities.removeIf(entity -> entity.removed);
+
+        // follows the player's middle rather than their feet, so they sit in the centre of the screen
+        lookAt(player.x + Player.FEET_X, player.y + playerHeight / 2.0);
     }
 
     void draw(Graphics2D g) {
-        drawBackground(g);
+        // the world is drawn in world coordinates, shifted so the camera's corner is the screen's corner;
+        // whole pixels, so tiles and sprites don't shimmer as the camera moves
+        Graphics2D world = (Graphics2D) g.create();
+        world.translate(-Math.round(cameraX), -Math.round(cameraY));
+        map.draw(world, Math.round(cameraX), Math.round(cameraY));
         if (inGame()) {
             entities.sort(Comparator.comparingDouble(Entity::depth));
             for (Entity entity : entities) {
-                entity.draw(g, this);
+                entity.draw(world, this);
             }
         }
+        world.dispose();
 
         // the shading covers the whole view; the text goes in the centred WIDTH x HEIGHT box
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -250,15 +274,6 @@ public class Game {
         if (menu != null) menu.draw(g);
     }
 
-    // the test image is 640 x 480, so it's scaled to cover the whole view and centred, cropping what doesn't fit
-    private void drawBackground(Graphics2D g) {
-        if (background == null) return;
-        double cover = Math.max(viewWidth / (double) background.getWidth(), viewHeight / (double) background.getHeight());
-        int w = (int) Math.ceil(background.getWidth() * cover);
-        int h = (int) Math.ceil(background.getHeight() * cover);
-        g.drawImage(background, (viewWidth - w) / 2, (viewHeight - h) / 2, w, h, null);
-    }
-
     // the action names right-aligned to the middle of the screen, the keys left-aligned after them
     private static void drawControls(Graphics2D g) {
         int middle = WIDTH / 2 - 70;
@@ -289,14 +304,5 @@ public class Game {
         g.drawString(text, x + 2, y + 2);
         g.setColor(color);
         g.drawString(text, x, y);
-    }
-
-    private static BufferedImage loadImage(String filename) {
-        try {
-            return ImageIO.read(new File(filename));
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
     }
 }

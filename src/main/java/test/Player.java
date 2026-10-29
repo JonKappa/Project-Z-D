@@ -39,6 +39,9 @@ public class Player extends Entity {
     static final double[] DODGE_PACE = {0.4, 1.3, 1.4, 1.4, 1.4, 1.3, 0.6, 0.2};
     static final double DIAGONAL_GRACE = 0.1; // seconds a diagonal facing survives one of its two keys being let go
     static final int MAX_HEALTH = 100;
+    // where the feet are in the sprite frame: the middle of the character, just above the bottom of the boots
+    static final int FEET_X = Sprite.CENTER_X;
+    static final int FEET_Y = 75;
 
     Facing facing = Facing.DOWN;
     State state = State.IDLE;
@@ -69,8 +72,8 @@ public class Player extends Entity {
 
     @Override
     void update(double dt, Game game) {
-        int maxX = game.viewWidth;
-        int maxY = game.viewHeight;
+        int maxX = game.map.pixelWidth();
+        int maxY = game.map.pixelHeight();
         if (state != State.DODGE && dodgePressed) {
             startDodge(dirX, dirY);
         }
