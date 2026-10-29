@@ -7,7 +7,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 // Tracks which keys are held. Listens at the window level, so it works no matter which component has focus.
-// Also tracks the mouse, in game coordinates (0 to Game.WIDTH, 0 to Game.HEIGHT), as reported by the panel.
+// Also tracks the mouse, in game coordinates (0 to the game's view width and height), as reported by the panel.
 public class Input implements KeyEventDispatcher {
 
     private final Set<Integer> held = new HashSet<>();

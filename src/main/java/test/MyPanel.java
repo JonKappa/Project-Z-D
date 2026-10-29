@@ -8,7 +8,8 @@ import java.awt.event.MouseEvent;
 import javax.swing.*;
 
 // The window's drawing surface. Runs the game loop on a Swing timer and draws whatever Game holds,
-// scaled up to fill the panel, with black bars if the panel isn't the game's 16:9 shape.
+// scaled up to fill the panel. If the panel isn't the game's 16:9 shape, the game's view grows wider or
+// taller to match, so the whole panel is filled with no black bars.
 public class MyPanel extends JPanel implements ActionListener {
 
     final Game game;
@@ -28,18 +29,15 @@ public class MyPanel extends JPanel implements ActionListener {
         timer.start();
     }
 
-    // how much the game is scaled up to fill the panel
+    // how much the game is scaled up: as far as its WIDTH x HEIGHT still fits in the panel
     private double scale() {
         return Math.min(getWidth() / (double) Game.WIDTH, getHeight() / (double) Game.HEIGHT);
     }
 
-    // where the game's top-left corner sits in the panel, after centring it between the black bars
-    private double offsetX() {
-        return (getWidth() - Game.WIDTH * scale()) / 2;
-    }
-
-    private double offsetY() {
-        return (getHeight() - Game.HEIGHT * scale()) / 2;
+    // tells the game how big its view is at that scale, so it fills the panel edge to edge
+    private void fitView() {
+        if (getWidth() <= 0 || getHeight() <= 0) return; // not on screen yet
+        game.resizeView((int) Math.ceil(getWidth() / scale()), (int) Math.ceil(getHeight() / scale()));
     }
 
     // passes the mouse to Input, turned from panel pixels into game pixels
@@ -70,11 +68,11 @@ public class MyPanel extends JPanel implements ActionListener {
     }
 
     private int gameX(MouseEvent e) {
-        return (int) Math.floor((e.getX() - offsetX()) / scale());
+        return (int) Math.floor(e.getX() / scale());
     }
 
     private int gameY(MouseEvent e) {
-        return (int) Math.floor((e.getY() - offsetY()) / scale());
+        return (int) Math.floor(e.getY() / scale());
     }
 
     // the window calls this once it exists, so keys held while it loses focus don't stay stuck down,
@@ -91,13 +89,13 @@ public class MyPanel extends JPanel implements ActionListener {
 
     @Override
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g); // fills the panel black, which leaves the bars
+        super.paintComponent(g);
+        fitView(); // in case the window was resized since the last tick
         Graphics2D g2D = (Graphics2D) g.create();
         // nearest neighbour keeps the pixel art sharp instead of blurring it when scaled up
         g2D.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-        g2D.translate(offsetX(), offsetY());
         g2D.scale(scale(), scale());
-        g2D.clipRect(0, 0, Game.WIDTH, Game.HEIGHT);
+        g2D.clipRect(0, 0, game.viewWidth, game.viewHeight);
         game.draw(g2D);
         g2D.dispose();
     }
@@ -109,6 +107,7 @@ public class MyPanel extends JPanel implements ActionListener {
         double dt = Math.min((now - lastTickTime) / 1_000_000_000.0, 0.05); // cap it so a hiccup can't teleport the player
         lastTickTime = now;
 
+        fitView();
         game.update(dt, input);
 
         input.endTick();

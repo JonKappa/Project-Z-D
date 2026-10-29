@@ -69,8 +69,8 @@ public class Player extends Entity {
 
     @Override
     void update(double dt, Game game) {
-        int maxX = Game.WIDTH;
-        int maxY = Game.HEIGHT;
+        int maxX = game.viewWidth;
+        int maxY = game.viewHeight;
         if (state != State.DODGE && dodgePressed) {
             startDodge(dirX, dirY);
         }
