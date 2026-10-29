@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
@@ -109,8 +110,15 @@ public class Game {
 
     // the panel calls this when the window changes shape; menus and text stay centred in the new view
     void resizeView(int width, int height) {
-        viewWidth = Math.max(width, WIDTH);
-        viewHeight = Math.max(height, HEIGHT);
+        width = Math.max(width, WIDTH);
+        height = Math.max(height, HEIGHT);
+        if (width == viewWidth && height == viewHeight) return;
+        // keep the camera on the same spot as the view grows or shrinks around it
+        double centreX = cameraX + viewWidth / 2.0;
+        double centreY = cameraY + viewHeight / 2.0;
+        viewWidth = width;
+        viewHeight = height;
+        lookAt(centreX, centreY);
         for (Menu menu : menus.values()) {
             menu.moveTo(uiX(), uiY());
         }
@@ -171,8 +179,15 @@ public class Game {
 
     // centres the camera on a world position, without showing past the edge of the map
     private void lookAt(double worldX, double worldY) {
-        cameraX = Math.max(0, Math.min(worldX - WIDTH / 2.0, map.pixelWidth() - WIDTH));
-        cameraY = Math.max(0, Math.min(worldY - HEIGHT / 2.0, map.pixelHeight() - HEIGHT));
+        cameraX = cameraEdge(worldX, viewWidth, map.pixelWidth());
+        cameraY = cameraEdge(worldY, viewHeight, map.pixelHeight());
+    }
+
+    // the camera's left (or top) edge to centre on a point without showing past the edge of the map;
+    // in a view bigger than the map, the map sits in the middle
+    private static double cameraEdge(double centre, int view, int mapSize) {
+        if (view >= mapSize) return (mapSize - view) / 2.0;
+        return Math.max(0, Math.min(centre - view / 2.0, mapSize - view));
     }
 
     // pauses a game in progress; does nothing on the other screens
@@ -231,23 +246,22 @@ public class Game {
         // the world is drawn in world coordinates, shifted so the camera's corner is the screen's corner;
         // whole pixels, so tiles and sprites don't shimmer as the camera moves
         Graphics2D world = (Graphics2D) g.create();
-        long viewX = Math.round(cameraX);
-        long viewY = Math.round(cameraY);
-        world.translate(-viewX, -viewY);
-        map.drawGround(world, viewX, viewY);
-        map.drawBackWalls(world, viewX, viewY);
+        Rectangle view = new Rectangle((int) Math.round(cameraX), (int) Math.round(cameraY), viewWidth, viewHeight);
+        world.translate(-view.x, -view.y);
+        map.drawGround(world, view);
+        map.drawBackWalls(world, view);
 
         // sprites and front walls from the top of the screen down: each row of front walls goes over
         // the sprites standing behind it (higher up the screen) and under the ones in front of it
         List<Entity> drawn = inGame() ? entities : List.of();
         entities.sort(Comparator.comparingDouble(Entity::depth));
         int next = 0;
-        for (int row = map.firstRow(viewY); row <= map.lastWallRow(viewY); row++) {
+        for (int row = map.firstRow(view); row <= map.lastWallRow(view); row++) {
             double wallDepth = (row + 1) * TileMap.TILE; // a wall row stands at the bottom edge of its tiles
             while (next < drawn.size() && drawn.get(next).depth() < wallDepth) {
                 drawn.get(next++).draw(world, this);
             }
-            map.drawFrontWalls(world, row, viewX);
+            map.drawFrontWalls(world, row, view);
         }
         while (next < drawn.size()) {
             drawn.get(next++).draw(world, this);

@@ -2,6 +2,7 @@ package test;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -143,14 +144,14 @@ public class TileMap {
         return rows * TILE;
     }
 
-    // The drawing below takes viewX and viewY, the world position of the screen's top-left corner,
-    // and only draws what's on screen. Game draws in this order: the ground, the back walls, then
+    // The drawing below takes view, the part of the world on screen (the camera's corner and the game's
+    // view size), and only draws what's inside it. Game draws in this order: the ground, the back walls, then
     // the sprites and each row of front walls interleaved from the top of the screen down.
 
     // the floor and the yard
-    void drawGround(Graphics2D g, double viewX, double viewY) {
-        for (int row = firstRow(viewY); row <= Math.min(rows - 1, lastGroundRow(viewY)); row++) {
-            for (int col = firstCol(viewX); col <= lastCol(viewX); col++) {
+    void drawGround(Graphics2D g, Rectangle view) {
+        for (int row = firstRow(view); row <= Math.min(rows - 1, lastGroundRow(view)); row++) {
+            for (int col = firstCol(view); col <= lastCol(view); col++) {
                 Tile tile = tiles[row][col];
                 if (!tile.solid) {
                     g.setColor(tile.colour);
@@ -168,40 +169,40 @@ public class TileMap {
     }
 
     // the back walls, drawn before any sprites
-    void drawBackWalls(Graphics2D g, double viewX, double viewY) {
-        for (int row = firstRow(viewY); row <= lastWallRow(viewY); row++) {
-            for (int col = firstCol(viewX); col <= lastCol(viewX); col++) {
+    void drawBackWalls(Graphics2D g, Rectangle view) {
+        for (int row = firstRow(view); row <= lastWallRow(view); row++) {
+            for (int col = firstCol(view); col <= lastCol(view); col++) {
                 if (tiles[row][col].solid && !isFrontWall(col, row)) drawWall(g, col, row);
             }
         }
     }
 
     // one row of front walls; Game draws the sprites standing behind this row first
-    void drawFrontWalls(Graphics2D g, int row, double viewX) {
-        for (int col = firstCol(viewX); col <= lastCol(viewX); col++) {
+    void drawFrontWalls(Graphics2D g, int row, Rectangle view) {
+        for (int col = firstCol(view); col <= lastCol(view); col++) {
             if (isFrontWall(col, row)) drawWall(g, col, row);
         }
     }
 
     // the rows whose walls can show on screen; a wall's top sits above its base, so this runs a row past the ground
-    int firstRow(double viewY) {
-        return Math.max(0, (int) Math.floor(viewY / TILE));
+    int firstRow(Rectangle view) {
+        return Math.max(0, Math.floorDiv(view.y, TILE));
     }
 
-    int lastWallRow(double viewY) {
-        return Math.min(rows - 1, (int) Math.floor((viewY + Game.HEIGHT + WALL_HEIGHT) / TILE));
+    int lastWallRow(Rectangle view) {
+        return Math.min(rows - 1, Math.floorDiv(view.y + view.height + WALL_HEIGHT, TILE));
     }
 
-    private int lastGroundRow(double viewY) {
-        return (int) Math.floor((viewY + Game.HEIGHT) / TILE);
+    private int lastGroundRow(Rectangle view) {
+        return Math.floorDiv(view.y + view.height, TILE);
     }
 
-    private int firstCol(double viewX) {
-        return Math.max(0, (int) Math.floor(viewX / TILE));
+    private int firstCol(Rectangle view) {
+        return Math.max(0, Math.floorDiv(view.x, TILE));
     }
 
-    private int lastCol(double viewX) {
-        return Math.min(cols - 1, (int) Math.floor((viewX + Game.WIDTH) / TILE));
+    private int lastCol(Rectangle view) {
+        return Math.min(cols - 1, Math.floorDiv(view.x + view.width, TILE));
     }
 
     // one wall tile: its face in its own tile and its top above that, with glass or wood set in
