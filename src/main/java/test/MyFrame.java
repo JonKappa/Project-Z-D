@@ -22,19 +22,17 @@ public class MyFrame extends JFrame{
     // goes fullscreen, or back to a window of the chosen size, centred on the screen
     void applyDisplaySettings() {
         Settings settings = panel.game.settings;
-        GraphicsDevice device = getGraphicsConfiguration().getDevice();
+        // the screen the window is on now, so fullscreen stays on that monitor
+        Rectangle screen = getGraphicsConfiguration().getBounds();
 
         // the window border can only be added or removed while the window is hidden
         if (isDisplayable()) dispose();
-        if (device.getFullScreenWindow() == this) device.setFullScreenWindow(null);
         setUndecorated(settings.fullscreen);
 
         if (settings.fullscreen) {
-            if (device.isFullScreenSupported()) {
-                device.setFullScreenWindow(this);
-            } else {
-                setBounds(device.getDefaultConfiguration().getBounds());
-            }
+            // a borderless window covering the screen, not Java's exclusive fullscreen mode: exclusive
+            // mode made Swing's drawing flicker, and leaving it lost the background image (black screen)
+            setBounds(screen);
             setVisible(true);
         } else {
             panel.setPreferredSize(windowSize(settings.windowScale));
