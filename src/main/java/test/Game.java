@@ -245,7 +245,10 @@ public class Game {
         lookAt(Math.round(player.x) + Player.FEET_X, Math.round(player.y) + playerHeight / 2.0);
     }
 
-    void draw(Graphics2D g) {
+    // the map and everything on it, one game pixel to one image pixel; the panel scales it up afterwards
+    void drawWorld(Graphics2D g) {
+        g.setColor(Color.BLACK);
+        g.fillRect(0, 0, viewWidth, viewHeight); // only shows if the view is bigger than the map
         // the world is drawn in world coordinates, shifted so the camera's corner is the screen's corner;
         // whole pixels, so tiles and sprites don't shimmer as the camera moves
         Graphics2D world = (Graphics2D) g.create();
@@ -270,7 +273,10 @@ public class Game {
             drawn.get(next++).draw(world, this);
         }
         world.dispose();
+    }
 
+    // the menus, text and shading over the world, drawn at the window's full resolution so text stays sharp
+    void drawOverlay(Graphics2D g) {
         // the shading covers the whole view; the text goes in the centred WIDTH x HEIGHT box
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         Graphics2D ui = (Graphics2D) g.create();
